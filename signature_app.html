@@ -266,13 +266,21 @@
     return lines;
   }
 
-  // ---- サイン+コメントをA4ページ1枚分のCanvasに合成 ----
-  function composeA4Canvas(signatureSrc, commentText) {
+  var COMPOSE_DPI = 150;
+
+  // ---- サイン+コメントをページ1枚分のCanvasに合成 ----
+  // コメントあり: A4縦、サイン上半分+コメント下半分
+  // コメントなし: A5横、サイン全面
+  function composeSignaturePage(signatureSrc, commentText) {
     return new Promise(function (resolve) {
-      var dpi = 150;
-      var wPx = Math.round(210 / 25.4 * dpi);
-      var hPx = Math.round(297 / 25.4 * dpi);
-      var margin = Math.round(15 / 25.4 * dpi);
+      var hasComment = !!(commentText && commentText.trim() !== '');
+      var pageWmm = 210;
+      var pageHmm = hasComment ? 297 : 148;
+      var wPx = Math.round(pageWmm / 25.4 * COMPOSE_DPI);
+      var hPx = Math.round(pageHmm / 25.4 * COMPOSE_DPI);
+      var margin = Math.round(15 / 25.4 * COMPOSE_DPI);
+      var dateAreaHeight = 60;
+
       var page = document.createElement('canvas');
       page.width = wPx;
       page.height = hPx;
@@ -282,32 +290,43 @@
 
       var img = new Image();
       img.onload = function () {
-        var maxW = wPx - margin * 2;
-        var maxH = Math.round(hPx * 0.5);
-        var scale = Math.min(maxW / img.width, maxH / img.height, 1);
+        var sigBoxX = margin, sigBoxY = margin, sigBoxW, sigBoxH;
+        if (hasComment) {
+          var halfH = hPx / 2;
+          sigBoxW = wPx - margin * 2;
+          sigBoxH = halfH - margin * 1.5;
+        } else {
+          sigBoxW = wPx - margin * 2;
+          sigBoxH = hPx - margin * 2 - dateAreaHeight;
+        }
+
+        var scale = Math.min(sigBoxW / img.width, sigBoxH / img.height, 1);
         var dw = img.width * scale;
         var dh = img.height * scale;
-        var dx = margin + (maxW - dw) / 2;
-        var dy = margin;
+        var dx = sigBoxX + (sigBoxW - dw) / 2;
+        var dy = sigBoxY + (sigBoxH - dh) / 2;
 
         pctx.strokeStyle = '#ccc';
-        pctx.strokeRect(margin, margin, maxW, maxH);
+        pctx.strokeRect(sigBoxX, sigBoxY, sigBoxW, sigBoxH);
         pctx.drawImage(img, dx, dy, dw, dh);
 
-        var dateAreaHeight = 60;
-
-        pctx.fillStyle = '#000';
-        pctx.font = '28px sans-serif';
-        var lineHeight = 40;
-        var lines = wrapText(pctx, commentText, maxW);
-        var y = margin + maxH + 50;
-        for (var i = 0; i < lines.length && y <= hPx - margin - dateAreaHeight; i++) {
-          pctx.fillText(lines[i], margin, y);
-          y += lineHeight;
+        if (hasComment) {
+          var maxW = wPx - margin * 2;
+          var textTop = hPx / 2 + margin / 2;
+          pctx.fillStyle = '#000';
+          pctx.font = '28px sans-serif';
+          var lineHeight = 40;
+          var lines = wrapText(pctx, commentText, maxW);
+          var y = textTop + 28;
+          for (var i = 0; i < lines.length && y <= hPx - margin - dateAreaHeight; i++) {
+            pctx.fillText(lines[i], margin, y);
+            y += lineHeight;
+          }
         }
 
         pctx.textAlign = 'right';
         pctx.font = '24px sans-serif';
+        pctx.fillStyle = '#000';
         pctx.fillText(formatDateTime(new Date()), wPx - margin, hPx - margin);
         pctx.textAlign = 'left';
 
@@ -326,7 +345,7 @@
     return bytes;
   }
 
-  function buildPDF(jpegBytes, widthPx, heightPx) {
+  function buildPDF(jpegBytes, widthPx, heightPx, pw, ph) {
     var encoder = new TextEncoder();
     var chunks = [];
     var offset = 0;
@@ -337,8 +356,6 @@
       chunks.push(bytes);
       offset += bytes.length;
     }
-
-    var pw = 595.28, ph = 841.89; // A4 (pt)
 
     push('%PDF-1.4\n');
 
@@ -379,11 +396,14 @@
     return result;
   }
 
-  function timestamp() {
+  // ファイル名: 日付(年月日) + "サイン取得"(固定) + コメント先頭5文字(空なら無し)
+  function buildFilename(commentText) {
     var d = new Date();
     function p(n) { return String(n).padStart(2, '0'); }
-    return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '_' +
-      p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
+    var datePart = d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate());
+    var cleaned = String(commentText || '').replace(/[\r\n\t\\/:*?"<>|]/g, '').trim();
+    var commentPart = cleaned ? cleaned.slice(0, 5) : '';
+    return datePart + 'サイン取得' + commentPart + '.pdf';
   }
 
   function formatDateTime(d) {
@@ -398,12 +418,14 @@
       alert('サインがありません。「開く」からサインを入力してください。');
       return;
     }
-    composeA4Canvas(signatureDataURL, commentEl.value).then(function (page) {
+    composeSignaturePage(signatureDataURL, commentEl.value).then(function (page) {
       var jpegDataURL = page.toDataURL('image/jpeg', 0.92);
       confirmImg.src = jpegDataURL;
       var jpegBytes = dataURLToBytes(jpegDataURL);
-      pendingPdfBytes = buildPDF(jpegBytes, page.width, page.height);
-      pendingFilename = 'signature_' + timestamp() + '.pdf';
+      var pwPt = page.width * 72 / COMPOSE_DPI;
+      var phPt = page.height * 72 / COMPOSE_DPI;
+      pendingPdfBytes = buildPDF(jpegBytes, page.width, page.height, pwPt, phPt);
+      pendingFilename = buildFilename(commentEl.value);
       showScreen('screen-confirm');
     });
   });
