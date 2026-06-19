@@ -27,7 +27,7 @@
   #btn-delete { background: #c62828; }
 
   label.field-label { font-size: 14px; color: #555; margin: 8px 0 6px; }
-  textarea#comment { flex: 1; min-height: 140px; width: 100%; padding: 10px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; resize: vertical; }
+  textarea#comment { flex: 1; min-height: 140px; width: 100%; padding: 10px; font-size: 18px; border: 1px solid #ccc; border-radius: 8px; resize: vertical; }
 
   .canvas-wrap { flex: 1; position: relative; background: #fff; margin: 10px; border: 1px solid #ccc; border-radius: 8px; overflow: hidden; }
   canvas#sign-canvas { width: 100%; height: 100%; display: block; touch-action: none; background: #fff; }
@@ -294,15 +294,23 @@
         pctx.strokeRect(margin, margin, maxW, maxH);
         pctx.drawImage(img, dx, dy, dw, dh);
 
+        var dateAreaHeight = 60;
+
         pctx.fillStyle = '#000';
         pctx.font = '28px sans-serif';
         var lineHeight = 40;
         var lines = wrapText(pctx, commentText, maxW);
         var y = margin + maxH + 50;
-        for (var i = 0; i < lines.length && y <= hPx - margin; i++) {
+        for (var i = 0; i < lines.length && y <= hPx - margin - dateAreaHeight; i++) {
           pctx.fillText(lines[i], margin, y);
           y += lineHeight;
         }
+
+        pctx.textAlign = 'right';
+        pctx.font = '24px sans-serif';
+        pctx.fillText(formatDateTime(new Date()), wPx - margin, hPx - margin);
+        pctx.textAlign = 'left';
+
         resolve(page);
       };
       img.src = signatureSrc;
@@ -376,6 +384,12 @@
     function p(n) { return String(n).padStart(2, '0'); }
     return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '_' +
       p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
+  }
+
+  function formatDateTime(d) {
+    function p(n) { return String(n).padStart(2, '0'); }
+    return d.getFullYear() + '/' + p(d.getMonth() + 1) + '/' + p(d.getDate()) + ' ' +
+      p(d.getHours()) + ':' + p(d.getMinutes());
   }
 
   // ---- 画面1: 外部へ保存 -> 確認画面(画面4)を表示 ----
