@@ -28,6 +28,7 @@
 
   label.field-label { font-size: 14px; color: #555; margin: 8px 0 6px; }
   textarea#comment { flex: 1; min-height: 140px; width: 100%; padding: 10px; font-size: 18px; border: 1px solid #ccc; border-radius: 8px; resize: vertical; }
+  select#sign-size { width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 8px; background: #fff; margin-bottom: 8px; }
 
   .canvas-wrap { flex: 1; position: relative; background: #fff; margin: 10px; border: 1px solid #ccc; border-radius: 8px; overflow: hidden; }
   canvas#sign-canvas { width: 100%; height: 100%; display: block; touch-action: none; background: #fff; }
@@ -52,6 +53,12 @@
       <button id="btn-delete" class="btn-big">削除</button>
       <label class="field-label" for="comment">コメント</label>
       <textarea id="comment" placeholder="コメントを入力してください"></textarea>
+      <label class="field-label" for="sign-size">サインサイズ</label>
+      <select id="sign-size">
+        <option value="large">大きい</option>
+        <option value="standard" selected>標準</option>
+        <option value="small">小さい</option>
+      </select>
     </main>
   </div>
 
@@ -100,6 +107,7 @@
 
   // ---- elements ----
   var commentEl = document.getElementById('comment');
+  var signSizeEl = document.getElementById('sign-size');
   var btnSaveExternal = document.getElementById('btn-save-external');
   var btnOpen = document.getElementById('btn-open');
   var btnDelete = document.getElementById('btn-delete');
@@ -267,11 +275,14 @@
   }
 
   var COMPOSE_DPI = 150;
+  var SIGN_SIZE_MULTIPLIERS = { large: 1, standard: 0.5, small: 0.125 };
 
   // ---- サイン+コメントをページ1枚分のCanvasに合成 ----
   // コメントあり: A4縦、サイン上半分+コメント下半分
   // コメントなし: A5横、サイン全面
-  function composeSignaturePage(signatureSrc, commentText) {
+  // サインサイズ(大きい/標準/小さい)は、上記の領域いっぱいに収まる大きさ
+  // (=大きい)を基準に、縦横ともにその1倍/0.5倍/0.125倍で中央配置する
+  function composeSignaturePage(signatureSrc, commentText, sizeOption) {
     return new Promise(function (resolve) {
       var hasComment = !!(commentText && commentText.trim() !== '');
       var pageWmm = 210;
@@ -300,7 +311,9 @@
           sigBoxH = hPx - margin * 2 - dateAreaHeight;
         }
 
-        var scale = Math.min(sigBoxW / img.width, sigBoxH / img.height, 1);
+        var fitScale = Math.min(sigBoxW / img.width, sigBoxH / img.height, 1);
+        var sizeMultiplier = SIGN_SIZE_MULTIPLIERS[sizeOption] || 1;
+        var scale = fitScale * sizeMultiplier;
         var dw = img.width * scale;
         var dh = img.height * scale;
         var dx = sigBoxX + (sigBoxW - dw) / 2;
@@ -418,7 +431,7 @@
       alert('サインがありません。「開く」からサインを入力してください。');
       return;
     }
-    composeSignaturePage(signatureDataURL, commentEl.value).then(function (page) {
+    composeSignaturePage(signatureDataURL, commentEl.value, signSizeEl.value).then(function (page) {
       var jpegDataURL = page.toDataURL('image/jpeg', 0.92);
       confirmImg.src = jpegDataURL;
       var jpegBytes = dataURLToBytes(jpegDataURL);
