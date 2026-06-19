@@ -301,18 +301,23 @@
 
       var img = new Image();
       img.onload = function () {
-        var sigBoxX = margin, sigBoxY = margin, sigBoxW, sigBoxH;
+        var refBoxX = margin, refBoxY = margin, refBoxW, refBoxH;
         if (hasComment) {
           var halfH = hPx / 2;
-          sigBoxW = wPx - margin * 2;
-          sigBoxH = halfH - margin * 1.5;
+          refBoxW = wPx - margin * 2;
+          refBoxH = halfH - margin * 1.5;
         } else {
-          sigBoxW = wPx - margin * 2;
-          sigBoxH = hPx - margin * 2 - dateAreaHeight;
+          refBoxW = wPx - margin * 2;
+          refBoxH = hPx - margin * 2 - dateAreaHeight;
         }
 
-        var fitScale = Math.min(sigBoxW / img.width, sigBoxH / img.height, 1);
         var sizeMultiplier = SIGN_SIZE_MULTIPLIERS[sizeOption] || 1;
+        var sigBoxW = refBoxW * sizeMultiplier;
+        var sigBoxH = refBoxH * sizeMultiplier;
+        var sigBoxX = refBoxX + (refBoxW - sigBoxW) / 2;
+        var sigBoxY = refBoxY + (refBoxH - sigBoxH) / 2;
+
+        var fitScale = Math.min(refBoxW / img.width, refBoxH / img.height, 1);
         var scale = fitScale * sizeMultiplier;
         var dw = img.width * scale;
         var dh = img.height * scale;
