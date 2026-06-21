@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>API連携チェッカー</title>
+<style>
+  :root {
+    --ok-color: #2e7d32;
+    --ng-color: #c62828;
+    --main-color: #1a73e8;
+    --bg-color: #f5f6f8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    background: var(--bg-color);
+    color: #222;
+    padding: 16px;
+  }
+  .container {
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 1.3rem;
+    margin: 0 0 4px;
+  }
+  .subtitle {
+    font-size: 0.85rem;
+    color: #666;
+    margin-bottom: 16px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  }
+  label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: bold;
+    margin-bottom: 6px;
+    color: #444;
+  }
+  select, input[type="text"], input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    margin-bottom: 4px;
+  }
+  .hint {
+    font-size: 0.75rem;
+    color: #888;
+    margin-bottom: 12px;
+  }
+  .hint a { color: var(--main-color); }
+  .secret-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .secret-row input { margin-bottom: 0; }
+  .secret-row button {
+    flex: 0 0 auto;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    background: #fff;
+    font-size: 0.85rem;
+  }
+  .extra-field { display: none; }
+  .extra-field.show { display: block; }
+  button.primary {
+    width: 100%;
+    padding: 14px;
+    font-size: 1rem;
+    font-weight: bold;
+    color: #fff;
+    background: var(--main-color);
+    border: none;
+    border-radius: 8px;
+    margin-top: 4px;
+  }
+  button.primary:disabled {
+    background: #9ab8e8;
+  }
+  button.secondary {
+    width: 100%;
+    padding: 12px;
+    font-size: 0.95rem;
+    color: var(--main-color);
+    background: #eef3fd;
+    border: none;
+    border-radius: 8px;
+    margin-top: 8px;
+  }
+  .result-box {
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 12px;
+    font-size: 0.9rem;
+    display: none;
+  }
+  .result-box.ok { background: #e6f4ea; color: var(--ok-color); display: block; }
+  .result-box.ng { background: #fdecea; color: var(--ng-color); display: block; }
+  .result-box.pending { background: #fff8e1; color: #8a6d00; display: block; }
+  details { margin-top: 8px; }
+  pre {
+    white-space: pre-wrap;
+    word-break: break-all;
+    background: #f1f1f1;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+  }
+  .history-item {
+    border-bottom: 1px solid #eee;
+    padding: 8px 0;
+    font-size: 0.82rem;
+  }
+  .history-item:last-child { border-bottom: none; }
+  .badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: 4px;
+  }
+  .badge.ok { background: var(--ok-color); color: #fff; }
+  .badge.ng { background: var(--ng-color); color: #fff; }
+  .badge.future { background: #999; color: #fff; }
+  footer {
+    font-size: 0.7rem;
+    color: #999;
+    text-align: center;
+    margin: 24px 0 8px;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>API連携チェッカー</h1>
+  <div class="subtitle">スマホのブラウザでAPIキーがHTML/JavaScriptから正常に呼び出せるか確認します。</div>
+
+  <div class="card">
+    <label for="service">テスト対象サービス</label>
+    <select id="service"></select>
+    <div class="hint" id="serviceHint"></div>
+
+    <label for="secretInput" id="secretLabel">APIキー</label>
+    <div class="secret-row">
+      <input type="password" id="secretInput" placeholder="ここにキー/トークンを貼り付け" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <button type="button" id="toggleSecret">表示</button>
+    </div>
+
+    <div class="extra-field" id="mapsExtra">
+      <label for="mapsAddress">確認用の住所（Geocoding APIテスト）</label>
+      <input type="text" id="mapsAddress" value="東京駅">
+    </div>
+
+    <button class="primary" id="runBtn">テスト実行</button>
+
+    <div class="result-box" id="resultBox"></div>
+  </div>
+
+  <div class="card">
+    <label>実行履歴</label>
+    <div id="historyLog" style="font-size:0.85rem;color:#888;">まだテストは実行されていません。</div>
+    <button class="secondary" id="saveBtn">チェックファイルを保存（内部ストレージ/Documents推奨）</button>
+  </div>
+
+  <footer>
+    入力したキーはこの端末からそれぞれのAPI提供元（Google / LINE）に直接送信されるだけで、<br>
+    どこにも保存・送信されません。保存したチェックファイルにはキーの一部のみ記録されます。
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // サービス定義: 新しいAPIを追加したい場合はこの配列に項目を増やすだけでよい。
+  // ---------------------------------------------------------------
+  var SERVICES = {
+    gemini: {
+      label: "Gemini API（今すぐ利用可）",
+      authLabel: "APIキー",
+      placeholder: "AIza... で始まるAPIキー",
+      hint: '取得先: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>',
+      future: false,
+      run: testGemini
+    },
+    maps: {
+      label: "Google Maps API（今後利用予定）",
+      authLabel: "APIキー",
+      placeholder: "Google Cloud Consoleで発行したAPIキー",
+      hint: "Geocoding APIが有効化されたキーが必要です。CORS制限で失敗する場合があります。",
+      future: true,
+      run: testMaps
+    },
+    gmail: {
+      label: "Gmail API（今後利用予定・OAuth要）",
+      authLabel: "アクセストークン（OAuth2）",
+      placeholder: "ya29.... で始まるアクセストークン",
+      hint: "APIキーではなくOAuth2アクセストークンが必要です。マニュアル参照。",
+      future: true,
+      run: testGmail
+    },
+    line: {
+      label: "LINE Messaging API（今後利用予定）",
+      authLabel: "チャネルアクセストークン",
+      placeholder: "LINE Developersコンソールで発行したトークン",
+      hint: "ブラウザから直接呼ぶとCORSで失敗する場合があります（その場合は仕様上の制限です）。",
+      future: true,
+      run: testLine
+    }
+  };
+
+  var history = [];
+
+  var serviceSelect = document.getElementById("service");
+  var serviceHint = document.getElementById("serviceHint");
+  var secretLabel = document.getElementById("secretLabel");
+  var secretInput = document.getElementById("secretInput");
+  var toggleSecretBtn = document.getElementById("toggleSecret");
+  var mapsExtra = document.getElementById("mapsExtra");
+  var mapsAddress = document.getElementById("mapsAddress");
+  var runBtn = document.getElementById("runBtn");
+  var resultBox = document.getElementById("resultBox");
+  var historyLog = document.getElementById("historyLog");
+  var saveBtn = document.getElementById("saveBtn");
+
+  Object.keys(SERVICES).forEach(function (key) {
+    var opt = document.createElement("option");
+    opt.value = key;
+    opt.textContent = SERVICES[key].label;
+    serviceSelect.appendChild(opt);
+  });
+
+  function currentService() {
+    return SERVICES[serviceSelect.value];
+  }
+
+  function updateServiceUI() {
+    var svc = currentService();
+    secretLabel.textContent = svc.authLabel;
+    secretInput.placeholder = svc.placeholder;
+    serviceHint.innerHTML = svc.hint;
+    mapsExtra.classList.toggle("show", serviceSelect.value === "maps");
+    resultBox.style.display = "none";
+  }
+  serviceSelect.addEventListener("change", updateServiceUI);
+  updateServiceUI();
+
+  toggleSecretBtn.addEventListener("click", function () {
+    var hidden = secretInput.type === "password";
+    secretInput.type = hidden ? "text" : "password";
+    toggleSecretBtn.textContent = hidden ? "非表示" : "表示";
+  });
+
+  function maskSecret(s) {
+    if (!s) return "";
+    if (s.length <= 8) return "*".repeat(s.length);
+    return s.slice(0, 4) + "*".repeat(Math.max(4, s.length - 8)) + s.slice(-4);
+  }
+
+  async function safeJson(res) {
+    try { return await res.json(); }
+    catch (e) { return null; }
+  }
+
+  // --- 各サービスのテスト処理 -------------------------------------
+
+  async function testGemini(apiKey) {
+    var listRes = await fetch("https://generativelanguage.googleapis.com/v1beta/models?key=" + encodeURIComponent(apiKey));
+    var listBody = await safeJson(listRes);
+    if (!listRes.ok) {
+      return { ok: false, summary: "APIキーが無効、または権限がありません (HTTP " + listRes.status + ")", detail: listBody };
+    }
+    var models = (listBody && Array.isArray(listBody.models)) ? listBody.models : [];
+    var genModel = models.find(function (m) {
+      return m.supportedGenerationMethods && m.supportedGenerationMethods.indexOf("generateContent") !== -1;
+    });
+    if (!genModel) {
+      return { ok: true, summary: "APIキーは有効ですが、利用可能なモデルが見つかりませんでした", detail: { modelCount: models.length } };
+    }
+    var genRes = await fetch("https://generativelanguage.googleapis.com/v1beta/" + genModel.name + ":generateContent?key=" + encodeURIComponent(apiKey), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: [{ parts: [{ text: "これはAPI接続確認テストです。「OK」とだけ返答してください。" }] }] })
+    });
+    var genBody = await safeJson(genRes);
+    if (!genRes.ok) {
+      return { ok: false, summary: "応答生成に失敗しました (HTTP " + genRes.status + ")", detail: genBody };
+    }
+    var text = "(応答なし)";
+    try { text = genBody.candidates[0].content.parts[0].text.trim(); } catch (e) {}
+    return { ok: true, summary: "Gemini APIキーは正常にHTMLから利用できました（使用モデル: " + genModel.name + ")", detail: { reply: text } };
+  }
+
+  async function testMaps(apiKey) {
+    var address = mapsAddress.value || "Tokyo";
+    var res = await fetch("https://maps.googleapis.com/maps/api/geocode/json?address=" + encodeURIComponent(address) + "&key=" + encodeURIComponent(apiKey));
+    var body = await safeJson(res);
+    if (body && body.status === "OK") {
+      var formatted = (body.results && body.results[0]) ? body.results[0].formatted_address : "";
+      return { ok: true, summary: "Google Maps APIキーは有効です", detail: { formatted_address: formatted } };
+    }
+    return { ok: false, summary: "Google Maps APIエラー: " + (body ? body.status : ("HTTP " + res.status)), detail: body };
+  }
+
+  async function testGmail(token) {
+    var res = await fetch("https://www.googleapis.com/gmail/v1/users/me/profile", {
+      headers: { "Authorization": "Bearer " + token }
+    });
+    var body = await safeJson(res);
+    if (res.ok) {
+      return { ok: true, summary: "Gmail APIアクセストークンは有効です (" + (body && body.emailAddress) + ")", detail: body };
+    }
+    return { ok: false, summary: "Gmail APIエラー (HTTP " + res.status + ")", detail: body };
+  }
+
+  async function testLine(token) {
+    try {
+      var res = await fetch("https://api.line.me/v2/bot/info", {
+        headers: { "Authorization": "Bearer " + token }
+      });
+      var body = await safeJson(res);
+      if (res.ok) {
+        return { ok: true, summary: "LINEチャネルアクセストークンは有効です (" + (body && body.displayName) + ")", detail: body };
+      }
+      return { ok: false, summary: "LINE APIエラー (HTTP " + res.status + ")", detail: body };
+    } catch (e) {
+      return { ok: false, summary: "通信エラーが発生しました（CORS等の制限の可能性があります）", detail: String(e) };
+    }
+  }
+
+  // --- 実行・表示・保存 -------------------------------------------
+
+  function renderResult(ok, summary, detail) {
+    resultBox.className = "result-box " + (ok ? "ok" : "ng");
+    var html = "<strong>" + (ok ? "OK: " : "NG: ") + summary + "</strong>";
+    if (detail) {
+      html += "<details><summary>詳細を見る</summary><pre>" + escapeHtml(JSON.stringify(detail, null, 2)) + "</pre></details>";
+    }
+    resultBox.innerHTML = html;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function renderHistory() {
+    if (history.length === 0) {
+      historyLog.textContent = "まだテストは実行されていません。";
+      return;
+    }
+    historyLog.innerHTML = history.slice().reverse().map(function (h) {
+      var badge = '<span class="badge ' + (h.ok ? "ok" : "ng") + '">' + (h.ok ? "OK" : "NG") + "</span>";
+      return '<div class="history-item">' + h.timestamp + " " + h.serviceLabel + badge + "<br>" + escapeHtml(h.summary) + "</div>";
+    }).join("");
+  }
+
+  runBtn.addEventListener("click", async function () {
+    var svc = currentService();
+    var secret = secretInput.value.trim();
+    if (!secret) {
+      renderResult(false, svc.authLabel + "を入力してください", null);
+      return;
+    }
+    runBtn.disabled = true;
+    runBtn.textContent = "テスト実行中...";
+    resultBox.className = "result-box pending";
+    resultBox.innerHTML = "テスト中です。しばらくお待ちください…";
+
+    var result;
+    try {
+      result = await svc.run(secret);
+    } catch (e) {
+      result = { ok: false, summary: "通信エラーが発生しました", detail: String(e) };
+    }
+
+    renderResult(result.ok, result.summary, result.detail);
+
+    history.push({
+      timestamp: new Date().toLocaleString("ja-JP"),
+      serviceLabel: svc.label.replace(/（.*?）/, ""),
+      secretMasked: maskSecret(secret),
+      ok: result.ok,
+      summary: result.summary,
+      detail: result.detail
+    });
+    renderHistory();
+
+    runBtn.disabled = false;
+    runBtn.textContent = "テスト実行";
+  });
+
+  function buildCheckFileContent() {
+    var lines = [];
+    lines.push("API連携チェック結果");
+    lines.push("作成日時: " + new Date().toLocaleString("ja-JP"));
+    lines.push("----------------------------------------");
+    if (history.length === 0) {
+      lines.push("(テスト未実行)");
+    }
+    history.forEach(function (h, i) {
+      lines.push("[" + (i + 1) + "] " + h.timestamp);
+      lines.push("サービス: " + h.serviceLabel);
+      lines.push("使用キー: " + h.secretMasked);
+      lines.push("結果: " + (h.ok ? "OK" : "NG"));
+      lines.push("詳細: " + h.summary);
+      if (h.detail) {
+        lines.push("応答: " + (typeof h.detail === "string" ? h.detail : JSON.stringify(h.detail)));
+      }
+      lines.push("");
+    });
+    return lines.join("\n");
+  }
+
+  saveBtn.addEventListener("click", function () {
+    var content = buildCheckFileContent();
+    var blob = new Blob([content], { type: "text/plain" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    var ts = new Date();
+    function pad(n) { return String(n).padStart(2, "0"); }
+    var fname = "check_" + ts.getFullYear() + pad(ts.getMonth() + 1) + pad(ts.getDate()) + "_" + pad(ts.getHours()) + pad(ts.getMinutes()) + pad(ts.getSeconds()) + ".txt";
+    a.href = url;
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+})();
+</script>
+</body>
+</html>
