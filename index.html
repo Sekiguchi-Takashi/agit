@@ -111,6 +111,14 @@ h2 {
   margin-top: 8px;
 }
 
+.top-load-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e5ea;
+  display: flex;
+  justify-content: center;
+}
+
 .message {
   color: #ff3b30;
   text-align: center;
@@ -122,7 +130,20 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   margin-bottom: 4px;
+}
+
+.career-header-buttons {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.career-header-buttons .btn {
+  padding: 9px 12px;
+  font-size: 14px;
+  white-space: nowrap;
 }
 
 .save-status {
@@ -227,6 +248,10 @@ h2 {
       <input type="number" id="birth-year-input" placeholder="例: 1990" inputmode="numeric">
       <button id="execute-btn" class="btn btn-primary">実行</button>
     </div>
+    <div class="top-load-section">
+      <button id="load-data-btn" class="btn btn-secondary">データ読み込み</button>
+      <input type="file" id="csv-file-input" accept=".csv,text/csv" hidden>
+    </div>
     <p id="top-message" class="message"></p>
   </section>
 
@@ -234,7 +259,10 @@ h2 {
   <section id="page-career" class="page">
     <header class="career-header">
       <h2>経歴</h2>
-      <button id="career-save-btn" class="btn btn-primary">保存</button>
+      <div class="career-header-buttons">
+        <button id="career-save-btn" class="btn btn-primary">保存</button>
+        <button id="career-csv-export-btn" class="btn btn-secondary">CSV出力</button>
+      </div>
     </header>
     <p id="career-save-status" class="save-status" aria-live="polite"></p>
     <div id="career-list" class="career-list"></div>
@@ -320,10 +348,6 @@ function route() {
     renderYearPage(data, year);
     showPage('page-year');
   } else {
-    if (data && data.hasSavedOnce) {
-      location.hash = '#career';
-      return;
-    }
     prefillTopPage(data);
     showPage('page-top');
   }
@@ -401,7 +425,6 @@ function onCareerSave() {
     }
   });
 
-  data.hasSavedOnce = true;
   saveData(data);
   flashStatus('career-save-status', '保存しました');
 }
@@ -425,9 +448,144 @@ function onYearSave() {
 
   const commentEl = document.getElementById('year-comment');
   data.years[currentYearViewing].comment = commentEl.value;
-  data.hasSavedOnce = true;
   saveData(data);
   flashStatus('year-save-status', '保存しました');
+}
+
+function getTodayDateString() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `${yyyy}${mm}${dd}`;
+}
+
+function csvEscapeField(value) {
+  const str = String(value ?? '');
+  if (/[",\n\r]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+function buildCsv(data) {
+  const rows = [['年', '学歴・社歴', 'コメント']];
+  const years = Object.keys(data.years).map(Number).sort((a, b) => a - b);
+  years.forEach((year) => {
+    const yearData = data.years[year];
+    rows.push([year, yearData.career || '', yearData.comment || '']);
+  });
+  return rows.map((row) => row.map(csvEscapeField).join(',')).join('\r\n');
+}
+
+function onCsvExport() {
+  const data = loadData();
+  if (!data || !data.years) return;
+
+  const csvBody = buildCsv(data);
+  const blob = new Blob(['\uFEFF' + csvBody], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const filename = `${getTodayDateString()}_読込用データ.csv`;
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (inQuotes) {
+      if (char === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += char;
+      }
+    } else if (char === '"') {
+      inQuotes = true;
+    } else if (char === ',') {
+      row.push(field);
+      field = '';
+    } else if (char === '\n') {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = '';
+    } else if (char === '\r') {
+      if (text[i + 1] !== '\n') {
+        row.push(field);
+        rows.push(row);
+        row = [];
+        field = '';
+      }
+    } else {
+      field += char;
+    }
+  }
+  if (field !== '' || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows.filter((r) => !(r.length === 1 && r[0] === ''));
+}
+
+function onCsvFileSelected(event) {
+  const fileInput = event.target;
+  const file = fileInput.files && fileInput.files[0];
+  if (!file) return;
+
+  const messageEl = document.getElementById('top-message');
+  const reader = new FileReader();
+
+  reader.onload = () => {
+    try {
+      const text = String(reader.result || '').replace(/^\uFEFF/, '');
+      const rows = parseCsv(text);
+      if (rows.length < 2) throw new Error('no data rows');
+
+      const years = {};
+      let minYear = null;
+      rows.slice(1).forEach((r) => {
+        const year = parseInt(r[0], 10);
+        if (isNaN(year)) return;
+        years[year] = { career: r[1] || '', comment: r[2] || '' };
+        if (minYear === null || year < minYear) minYear = year;
+      });
+      if (minYear === null) throw new Error('no valid year rows');
+
+      const data = initYears(minYear);
+      Object.keys(years).forEach((y) => {
+        data.years[y] = years[y];
+      });
+      saveData(data);
+
+      messageEl.textContent = '';
+      location.hash = '#career';
+    } catch (e) {
+      messageEl.textContent = 'CSVファイルの読み込みに失敗しました。ファイル形式を確認してください。';
+    } finally {
+      fileInput.value = '';
+    }
+  };
+  reader.onerror = () => {
+    messageEl.textContent = 'ファイルの読み込みに失敗しました。';
+    fileInput.value = '';
+  };
+  reader.readAsText(file, 'utf-8');
 }
 
 function autoResizeTextarea(el) {
@@ -448,7 +606,12 @@ window.addEventListener('hashchange', route);
 
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('execute-btn').addEventListener('click', onExecute);
+  document.getElementById('load-data-btn').addEventListener('click', () => {
+    document.getElementById('csv-file-input').click();
+  });
+  document.getElementById('csv-file-input').addEventListener('change', onCsvFileSelected);
   document.getElementById('career-save-btn').addEventListener('click', onCareerSave);
+  document.getElementById('career-csv-export-btn').addEventListener('click', onCsvExport);
   document.getElementById('year-save-btn').addEventListener('click', onYearSave);
   document.getElementById('year-back-btn').addEventListener('click', () => {
     location.hash = '#career';
