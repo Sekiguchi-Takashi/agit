@@ -320,6 +320,10 @@ function route() {
     renderYearPage(data, year);
     showPage('page-year');
   } else {
+    if (data && data.hasSavedOnce) {
+      location.hash = '#career';
+      return;
+    }
     prefillTopPage(data);
     showPage('page-top');
   }
@@ -397,6 +401,7 @@ function onCareerSave() {
     }
   });
 
+  data.hasSavedOnce = true;
   saveData(data);
   flashStatus('career-save-status', '保存しました');
 }
@@ -420,6 +425,7 @@ function onYearSave() {
 
   const commentEl = document.getElementById('year-comment');
   data.years[currentYearViewing].comment = commentEl.value;
+  data.hasSavedOnce = true;
   saveData(data);
   flashStatus('year-save-status', '保存しました');
 }
