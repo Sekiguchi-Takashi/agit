@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>スパイダーソリティア</title>
+<style>
+  :root {
+    --table-green: #1f6b3a;
+    --table-green-dark: #154d29;
+    --card-w: 76px;
+    --card-h: 106px;
+    --fan-offset: 26px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--table-green-dark);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
+    touch-action: none;
+    user-select: none;
+  }
+  #app {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------- Rotate prompt for portrait ---------- */
+  #rotatePrompt {
+    position: fixed;
+    inset: 0;
+    background: #0b3d20;
+    color: #fff;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    text-align: center;
+    padding: 20px;
+  }
+  #rotatePrompt .icon { font-size: 64px; margin-bottom: 16px; animation: rot 1.6s ease-in-out infinite; }
+  @keyframes rot { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(90deg); } }
+  body.portrait #rotatePrompt { display: flex; }
+  body.portrait #app { display: none; }
+
+  /* ---------- Top bar ---------- */
+  #topbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: rgba(0,0,0,0.35);
+    color: #fff;
+    font-size: 13px;
+    z-index: 10;
+  }
+  #topbar .stat { display:flex; flex-direction:column; align-items:center; min-width: 46px; }
+  #topbar .stat b { font-size: 15px; }
+  #topbar .stat span { font-size: 10px; opacity: 0.75; }
+  #topbar .spacer { flex: 1; }
+  #topbar button {
+    background: #2d8a4e;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.3) inset, 0 2px 3px rgba(0,0,0,0.3);
+  }
+  #topbar button:active { background: #226a3c; }
+  #topbar button:disabled { opacity: 0.4; }
+  #topbar .title { font-weight: 700; font-size: 14px; letter-spacing: 1px; }
+
+  /* ---------- Board ---------- */
+  #board {
+    position: relative;
+    flex: 1 1 auto;
+    background: var(--table-green);
+    background-image: radial-gradient(circle at 50% 0%, rgba(255,255,255,0.05), transparent 60%);
+    overflow: hidden;
+  }
+
+  .stock-pile {
+    position: absolute;
+    width: 46px;
+    height: 64px;
+    border-radius: 7px;
+    background: linear-gradient(135deg,#2b6, #197a3f);
+    border: 2px solid rgba(255,255,255,0.35);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+    z-index: 5;
+  }
+  .stock-pile .stock-pip {
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color: rgba(255,255,255,0.85); font-size: 18px; font-weight: 700;
+  }
+
+  .tableau-col {
+    position: absolute;
+    top: 0;
+    width: var(--card-w);
+  }
+
+  .card {
+    position: absolute;
+    width: var(--card-w);
+    height: var(--card-h);
+    border-radius: 7px;
+    left: 0;
+    background: #fdfdfd;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    border: 1px solid rgba(0,0,0,0.25);
+    transition: box-shadow 0.15s, transform 0.12s;
+    will-change: transform;
+  }
+  .card.dragging {
+    transition: none;
+    z-index: 500;
+    box-shadow: 0 10px 18px rgba(0,0,0,0.55);
+  }
+  .card.face-down {
+    background: linear-gradient(135deg, #1c4f8c, #123a68);
+    background-image:
+      repeating-linear-gradient(45deg, rgba(255,255,255,0.06) 0 6px, transparent 6px 12px);
+    border: 1px solid rgba(255,255,255,0.25);
+  }
+  .card.face-down::after {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 4px;
+  }
+  .card .corner {
+    position: absolute;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+  }
+  .card .corner.tl { top: 4px; left: 5px; font-size: 14px; }
+  .card .corner.br { bottom: 4px; right: 5px; font-size: 14px; transform: rotate(180deg); }
+  .card .suitmark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 30px;
+    opacity: 0.9;
+  }
+  .card .corner .s { display:block; font-size: 12px; margin-top: -1px; }
+  .card.red { color: #c41818; }
+  .card.black { color: #181818; }
+  .card.selected {
+    box-shadow: 0 0 0 3px #ffd54a, 0 6px 14px rgba(0,0,0,0.5);
+    z-index: 400;
+  }
+  .card.highlight-drop {
+    box-shadow: 0 0 0 3px #6af0a0;
+  }
+  .card.movable-hint {
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.35);
+  }
+
+  #emptyColHint {
+    position: absolute;
+    width: var(--card-w);
+    height: var(--card-h);
+    border-radius: 7px;
+    border: 2px dashed rgba(255,255,255,0.25);
+  }
+
+  .foundation-pile {
+    position: absolute;
+    width: var(--card-w);
+    height: var(--card-h);
+    border-radius: 7px;
+    border: 2px solid rgba(255,255,255,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,0.4);
+    font-size: 26px;
+    overflow: hidden;
+  }
+
+  /* ---------- Win overlay ---------- */
+  #winOverlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    color: #fff;
+    z-index: 600;
+    text-align: center;
+    padding: 16px;
+  }
+  #winOverlay.show { display: flex; }
+  #winOverlay h1 { font-size: 28px; margin: 0 0 8px; }
+  #winOverlay p { margin: 4px 0 16px; opacity: 0.85; }
+  #winOverlay button {
+    background: #2d8a4e;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  /* ---------- New game menu ---------- */
+  #menuOverlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 700;
+  }
+  #menuOverlay.show { display: flex; }
+  #menuOverlay .panel {
+    background: #154d29;
+    border-radius: 12px;
+    padding: 18px 22px;
+    color: #fff;
+    text-align: center;
+    min-width: 260px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+  #menuOverlay h2 { margin: 0 0 12px; font-size: 18px; }
+  #menuOverlay .opts { display:flex; gap: 8px; justify-content:center; margin-bottom: 14px; flex-wrap: wrap; }
+  #menuOverlay .opts button {
+    background: #2d8a4e; color:#fff; border:none; border-radius:8px;
+    padding: 8px 12px; font-size: 13px; font-weight:600;
+  }
+  #menuOverlay .opts button.active { background:#ffd54a; color:#222; }
+  #menuOverlay .start-btn {
+    background:#1976d2; color:#fff; border:none; border-radius:8px;
+    padding:9px 20px; font-size:14px; font-weight:700;
+  }
+
+  #toast {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    z-index: 800;
+  }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="rotatePrompt">
+  <div class="icon">📱</div>
+  <div>画面を横向きにしてください<br><small>Please rotate your device to landscape</small></div>
+</div>
+
+<div id="app">
+  <div id="topbar">
+    <div class="title">♠ SPIDER</div>
+    <div class="stat"><b id="statScore">0</b><span>score</span></div>
+    <div class="stat"><b id="statMoves">0</b><span>moves</span></div>
+    <div class="stat"><b id="statDone">0</b><span>/8</span></div>
+    <div class="spacer"></div>
+    <button id="btnUndo">戻す</button>
+    <button id="btnHint">ヒント</button>
+    <button id="btnNew">新規</button>
+  </div>
+  <div id="board">
+    <div id="emptyColHint" style="display:none;"></div>
+    <!-- columns, stock, foundations injected by JS -->
+    <div id="winOverlay">
+      <h1>🎉 CLEAR! 🎉</h1>
+      <p id="winStats"></p>
+      <button id="btnWinNew">もう一度プレイ</button>
+    </div>
+  </div>
+  <div id="toast"></div>
+</div>
+
+<div id="menuOverlay">
+  <div class="panel">
+    <h2>難易度を選択</h2>
+    <div class="opts" id="suitOpts">
+      <button data-suits="1">1スート（簡単）</button>
+      <button data-suits="2">2スート（普通）</button>
+      <button data-suits="4">4スート（難しい）</button>
+    </div>
+    <button class="start-btn" id="btnStart">スタート</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  "use strict";
+
+  /* ===================== Orientation handling ===================== */
+  function checkOrientation() {
+    var portrait = window.innerHeight > window.innerWidth;
+    document.body.classList.toggle('portrait', portrait);
+    if (!portrait) layoutBoard();
+  }
+  window.addEventListener('resize', checkOrientation);
+  window.addEventListener('orientationchange', checkOrientation);
+
+  /* ===================== Card model ===================== */
+  var SUITS = ['S','H','D','C']; // Spades, Hearts, Diamonds, Clubs
+  var SUIT_SYMBOL = { S:'♠', H:'♥', D:'♦', C:'♣' };
+  var SUIT_COLOR = { S:'black', H:'red', D:'red', C:'black' };
+  var RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+
+  function makeDeck(numSuits) {
+    // Spider uses 8 decks worth of one suit set repeated to fill 104 cards,
+    // depending on numSuits (1, 2, or 4 suits used across 8 sets of 13).
+    var suitsToUse;
+    if (numSuits === 1) suitsToUse = ['S'];
+    else if (numSuits === 2) suitsToUse = ['S','H'];
+    else suitsToUse = ['S','H','D','C'];
+
+    var setsPerSuit = 8 / suitsToUse.length; // total 104 cards = 8 sets of 13
+    var deck = [];
+    var id = 0;
+    for (var s = 0; s < suitsToUse.length; s++) {
+      for (var copy = 0; copy < setsPerSuit; copy++) {
+        for (var r = 0; r < RANKS.length; r++) {
+          deck.push({
+            id: 'c' + (id++),
+            suit: suitsToUse[s],
+            rank: r + 1, // 1..13
+            faceUp: false
+          });
+        }
+      }
+    }
+    return deck;
+  }
+
+  function shuffle(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  }
+
+  /* ===================== Game state ===================== */
+  var state = {
+    columns: [],   // array of 10 arrays of card objects
+    stock: [],     // remaining stock cards (5 deals of 10)
+    foundations: [], // completed sequences (each is array of 13 cards), just for display/count
+    score: 0,
+    moves: 0,
+    history: [],
+    numSuits: 2,
+    selected: null // {col, index}
+  };
+
+  var DOM = {
+    board: document.getElementById('board'),
+    statScore: document.getElementById('statScore'),
+    statMoves: document.getElementById('statMoves'),
+    statDone: document.getElementById('statDone'),
+    winOverlay: document.getElementById('winOverlay'),
+    winStats: document.getElementById('winStats'),
+    menuOverlay: document.getElementById('menuOverlay'),
+    toast: document.getElementById('toast'),
+    emptyColHint: document.getElementById('emptyColHint')
+  };
+
+  var NUM_COLS = 10;
+
+  function newGame(numSuits) {
+    state.numSuits = numSuits || state.numSuits;
+    var deck = shuffle(makeDeck(state.numSuits));
+    state.columns = [];
+    for (var i = 0; i < NUM_COLS; i++) state.columns.push([]);
+
+    // Deal: 54 cards to tableau (4 columns of 6, 6 columns of 5 - total 54), rest 50 to stock
+    var dealCounts = [6,6,6,6,5,5,5,5,5,5];
+    var idx = 0;
+    for (var c = 0; c < NUM_COLS; c++) {
+      for (var k = 0; k < dealCounts[c]; k++) {
+        var card = deck[idx++];
+        card.faceUp = (k === dealCounts[c] - 1);
+        state.columns[c].push(card);
+      }
+    }
+    state.stock = deck.slice(idx); // remaining 50 cards, face down, 5 deals of 10
+    state.foundations = [];
+    state.score = 500;
+    state.moves = 0;
+    state.history = [];
+    state.selected = null;
+
+    hideWin();
+    render();
+    showToast(state.numSuits + 'スートで開始！');
+  }
+
+  /* ===================== History (undo) ===================== */
+  function snapshot() {
+    return JSON.stringify({
+      columns: state.columns,
+      stock: state.stock,
+      foundations: state.foundations,
+      score: state.score,
+      moves: state.moves
+    });
+  }
+  function pushHistory() {
+    state.history.push(snapshot());
+    if (state.history.length > 200) state.history.shift();
+  }
+  function undo() {
+    if (!state.history.length) { showToast('これ以上戻せません'); return; }
+    var snap = JSON.parse(state.history.pop());
+    state.columns = snap.columns;
+    state.stock = snap.stock;
+    state.foundations = snap.foundations;
+    state.score = snap.score;
+    state.moves = snap.moves;
+    state.selected = null;
+    render();
+  }
+
+  /* ===================== Game rules ===================== */
+  function isSequential(cards) {
+    // cards: array from some index to end of a column; must be same suit & descending rank by 1, all face up
+    for (var i = 0; i < cards.length; i++) {
+      if (!cards[i].faceUp) return false;
+    }
+    for (var i = 0; i < cards.length - 1; i++) {
+      if (cards[i].suit !== cards[i+1].suit) return false;
+      if (cards[i].rank !== cards[i+1].rank + 1) return false;
+    }
+    return true;
+  }
+
+  function canPlace(movingCards, destCol) {
+    if (destCol.length === 0) return true;
+    var top = destCol[destCol.length - 1];
+    var first = movingCards[0];
+    return top.faceUp && top.rank === first.rank + 1;
+  }
+
+  function getMovableStack(colIndex, cardIndex) {
+    var col = state.columns[colIndex];
+    var stack = col.slice(cardIndex);
+    if (isSequential(stack)) return stack;
+    return null;
+  }
+
+  function tryAutoCompleteFoundation(colIndex) {
+    var col = state.columns[colIndex];
+    if (col.length < 13) return false;
+    var top13 = col.slice(col.length - 13);
+    if (top13[0].rank !== 13) return false; // must start with King on top of stack visually = last 13 desc from K to A
+    // top13 ordered from earliest (King) to latest (Ace) since stack appended bottom->top
+    for (var i = 0; i < 13; i++) {
+      if (top13[i].rank !== 13 - i) return false;
+      if (top13[i].suit !== top13[0].suit) return false;
+      if (!top13[i].faceUp) return false;
+    }
+    // remove and store as foundation
+    col.length = col.length - 13;
+    state.foundations.push(top13);
+    state.score += 100;
+    if (col.length > 0) col[col.length - 1].faceUp = true;
+    return true;
+  }
+
+  function checkWin() {
+    return state.foundations.length === 8;
+  }
+
+  /* ===================== Rendering ===================== */
+  var layout = {
+    cardW: 76, cardH: 106, colGap: 6, fanOffsetUp: 26, fanOffsetDown: 12,
+    topPad: 64, leftPad: 8
+  };
+
+  function computeLayout() {
+    var bw = DOM.board.clientWidth;
+    var bh = DOM.board.clientHeight;
+    var totalGap = layout.colGap * (NUM_COLS - 1);
+    var availW = bw - layout.leftPad * 2;
+    var cardW = Math.floor((availW - totalGap) / NUM_COLS);
+    cardW = Math.max(40, Math.min(cardW, 90));
+    var cardH = Math.floor(cardW * 1.4);
+    layout.cardW = cardW;
+    layout.cardH = cardH;
+    layout.fanOffsetUp = Math.max(16, Math.floor(cardH * 0.26));
+    layout.fanOffsetDown = Math.max(8, Math.floor(cardH * 0.12));
+    layout.topPad = 84; // fixed header strip (stock pile + foundations) height, independent of card size
+    var usedW = NUM_COLS * cardW + totalGap;
+    layout.leftPad = Math.max(8, Math.floor((bw - usedW) / 2));
+    document.documentElement.style.setProperty('--card-w', cardW + 'px');
+    document.documentElement.style.setProperty('--card-h', cardH + 'px');
+  }
+
+  function colX(colIndex) {
+    return layout.leftPad + colIndex * (layout.cardW + layout.colGap);
+  }
+
+  function cardY(stackIndex, col) {
+    // stackIndex from bottom(0); compute cumulative offset based on face state of cards before it
+    var y = 0;
+    for (var i = 0; i < stackIndex; i++) {
+      y += col[i].faceUp ? layout.fanOffsetUp : layout.fanOffsetDown;
+    }
+    return layout.topPad + y;
+  }
+
+  function colHeight(col) {
+    if (!col.length) return layout.topPad + layout.cardH;
+    return cardY(col.length - 1, col) + layout.cardH;
+  }
+
+  var cardElems = {}; // id -> DOM element
+
+  function buildStaticDom() {
+    // remove old card/column/stock/foundation elements except overlays
+    var board = DOM.board;
+    var keep = [DOM.emptyColHint, DOM.winOverlay];
+    Array.prototype.slice.call(board.children).forEach(function(el) {
+      if (keep.indexOf(el) === -1) board.removeChild(el);
+    });
+    cardElems = {};
+
+    // foundation piles (top-right area, small indicator row)
+    var foundWrap = document.createElement('div');
+    foundWrap.id = 'foundWrap';
+    foundWrap.style.position = 'absolute';
+    foundWrap.style.top = '6px';
+    foundWrap.style.right = '8px';
+    foundWrap.style.display = 'flex';
+    foundWrap.style.gap = '4px';
+    for (var f = 0; f < 8; f++) {
+      var fp = document.createElement('div');
+      fp.className = 'foundation-pile';
+      fp.style.position = 'static';
+      fp.style.width = '22px';
+      fp.style.height = '30px';
+      fp.style.borderRadius = '4px';
+      fp.style.fontSize = '14px';
+      fp.dataset.findex = f;
+      foundWrap.appendChild(fp);
+    }
+    board.appendChild(foundWrap);
+    DOM.foundWrap = foundWrap;
+
+    // stock pile (bottom-left, click to deal)
+    var stockEl = document.createElement('div');
+    stockEl.id = 'stockPile';
+    stockEl.className = 'stock-pile';
+    stockEl.style.position = 'absolute';
+    stockEl.innerHTML = '<div class="stock-pip"></div>';
+    stockEl.addEventListener('click', onStockClick);
+    board.appendChild(stockEl);
+    DOM.stockEl = stockEl;
+
+    // columns
+    DOM.colEls = [];
+    for (var c = 0; c < NUM_COLS; c++) {
+      var colEl = document.createElement('div');
+      colEl.className = 'tableau-col';
+      colEl.dataset.col = c;
+      colEl.addEventListener('click', function(e) {
+        var ci = parseInt(this.dataset.col, 10);
+        onColumnAreaClick(ci);
+      });
+      board.appendChild(colEl);
+      DOM.colEls.push(colEl);
+    }
+  }
+
+  function cardLabel(card) {
+    return RANKS[card.rank - 1];
+  }
+
+  function createCardElement(card) {
+    var el = document.createElement('div');
+    el.className = 'card ' + (SUIT_COLOR[card.suit] === 'red' ? 'red' : 'black');
+    el.dataset.id = card.id;
+    el.innerHTML =
+      '<div class="corner tl">' + cardLabel(card) + '<span class="s">' + SUIT_SYMBOL[card.suit] + '</span></div>' +
+      '<div class="suitmark">' + SUIT_SYMBOL[card.suit] + '</div>' +
+      '<div class="corner br">' + cardLabel(card) + '<span class="s">' + SUIT_SYMBOL[card.suit] + '</span></div>';
+    attachDragHandlers(el);
+    return el;
+  }
+
+  function render() {
+    computeLayout();
+    if (!DOM.colEls) buildStaticDom();
+    layoutBoard();
+  }
+
+  function layoutBoard() {
+    if (!DOM.colEls) return;
+    computeLayout();
+
+    // stock position: header strip, top-left (fixed, never overlaps tableau columns)
+    DOM.stockEl.style.left = '8px';
+    DOM.stockEl.style.top = '6px';
+    DOM.stockEl.style.display = state.stock.length ? 'block' : 'none';
+    var dealsLeft = Math.ceil(state.stock.length / NUM_COLS);
+    DOM.stockEl.querySelector('.stock-pip').textContent = dealsLeft > 0 ? dealsLeft : '';
+
+    // foundations top-right - update fill colors
+    var fEls = DOM.foundWrap.children;
+    for (var f = 0; f < fEls.length; f++) {
+      var pile = state.foundations[f];
+      if (pile) {
+        fEls[f].style.background = (SUIT_COLOR[pile[0].suit] === 'red') ? '#c41818' : '#222';
+        fEls[f].style.color = '#fff';
+        fEls[f].textContent = SUIT_SYMBOL[pile[0].suit];
+      } else {
+        fEls[f].style.background = 'transparent';
+        fEls[f].textContent = '';
+      }
+    }
+
+    // columns
+    var seen = {};
+    for (var c = 0; c < NUM_COLS; c++) {
+      var col = state.columns[c];
+      var colEl = DOM.colEls[c];
+      colEl.style.left = colX(c) + 'px';
+      colEl.style.height = Math.max(colHeight(col), DOM.board.clientHeight - layout.topPad) + 'px';
+
+      for (var i = 0; i < col.length; i++) {
+        var card = col[i];
+        var el = cardElems[card.id];
+        if (!el) {
+          el = createCardElement(card);
+          DOM.board.appendChild(el);
+          cardElems[card.id] = el;
+        }
+        seen[card.id] = true;
+        el.classList.toggle('face-down', !card.faceUp);
+        if (card.faceUp) {
+          el.innerHTML =
+            '<div class="corner tl">' + cardLabel(card) + '<span class="s">' + SUIT_SYMBOL[card.suit] + '</span></div>' +
+            '<div class="suitmark">' + SUIT_SYMBOL[card.suit] + '</div>' +
+            '<div class="corner br">' + cardLabel(card) + '<span class="s">' + SUIT_SYMBOL[card.suit] + '</span></div>';
+        } else {
+          el.innerHTML = '';
+        }
+        var x = colX(c);
+        var y = cardY(i, col);
+        if (!el.classList.contains('dragging')) {
+          el.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+        }
+        el.style.zIndex = 10 + i;
+        el.dataset.col = c;
+        el.dataset.index = i;
+
+        el.classList.toggle('selected', !!(state.selected && state.selected.col === c && state.selected.index === i));
+      }
+    }
+
+    // remove DOM elements for cards no longer present anywhere (e.g., moved to foundation) handled lazily:
+    Object.keys(cardElems).forEach(function(id) {
+      if (!seen[id]) {
+        var el = cardElems[id];
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+        delete cardElems[id];
+      }
+    });
+
+    DOM.statScore.textContent = state.score;
+    DOM.statMoves.textContent = state.moves;
+    DOM.statDone.textContent = state.foundations.length;
+  }
+
+  /* ===================== Interaction: tap-to-select & drag ===================== */
+  var drag = null; // {colIndex, cardIndex, cards: [...el], startX, startY, origX, origY, elList}
+
+  function clearSelection() {
+    state.selected = null;
+    layoutBoard();
+  }
+
+  function onColumnAreaClick(colIndex) {
+    var col = state.columns[colIndex];
+    if (state.selected) {
+      // attempt move into this column (clicked empty area below cards)
+      attemptMove(state.selected.col, state.selected.index, colIndex);
+    }
+  }
+
+  function attemptMove(srcCol, srcIndex, destColIndex) {
+    if (srcCol === destColIndex) { clearSelection(); return; }
+    var stack = getMovableStack(srcCol, srcIndex);
+    if (!stack) { showToast('連続した同スートのみ動かせます'); clearSelection(); return; }
+    var destCol = state.columns[destColIndex];
+    if (!canPlace(stack, destCol)) { showToast('そこには置けません'); clearSelection(); return; }
+
+    pushHistory();
+    state.columns[srcCol].length = srcIndex;
+    if (state.columns[srcCol].length > 0) {
+      state.columns[srcCol][state.columns[srcCol].length - 1].faceUp = true;
+    }
+    for (var i = 0; i < stack.length; i++) destCol.push(stack[i]);
+    state.moves++;
+    state.score = Math.max(0, state.score - 1);
+
+    tryAutoCompleteFoundation(destColIndex);
+    state.selected = null;
+    layoutBoard();
+    if (checkWin()) {
+      setTimeout(showWin, 300);
+    }
+  }
+
+  function attachDragHandlers(el) {
+    el.addEventListener('pointerdown', function(e) {
+      onCardPointerDown(e, el);
+    });
+  }
+
+  function onCardPointerDown(e, el) {
+    e.preventDefault();
+    var colIndex = parseInt(el.dataset.col, 10);
+    var cardIndex = parseInt(el.dataset.index, 10);
+    var col = state.columns[colIndex];
+    var card = col[cardIndex];
+    if (!card.faceUp) {
+      // face-down: only clickable if it's top card of stock? Not part of tableau direct flip in spider.
+      return;
+    }
+
+    var stack = getMovableStack(colIndex, cardIndex);
+
+    // Tap-to-select logic combined with drag
+    var startX = e.clientX, startY = e.clientY;
+    var moved = false;
+    var elList = [];
+    var origPos = [];
+
+    if (stack) {
+      for (var i = 0; i < stack.length; i++) {
+        var cEl = cardElems[stack[i].id];
+        elList.push(cEl);
+        var m = cEl.style.transform.match(/translate\(([-\d.]+)px,([-\d.]+)px\)/);
+        origPos.push({x: m ? parseFloat(m[1]) : 0, y: m ? parseFloat(m[2]) : 0});
+      }
+    }
+
+    function onMove(ev) {
+      var dx = ev.clientX - startX;
+      var dy = ev.clientY - startY;
+      if (!moved && Math.abs(dx) + Math.abs(dy) > 6) {
+        moved = true;
+        if (stack) {
+          elList.forEach(function(cEl) { cEl.classList.add('dragging'); });
+        }
+      }
+      if (moved && stack) {
+        for (var i = 0; i < elList.length; i++) {
+          elList[i].style.transform = 'translate(' + (origPos[i].x + dx) + 'px,' + (origPos[i].y + dy) + 'px)';
+          elList[i].style.zIndex = 1000 + i;
+        }
+        highlightDropTarget(ev.clientX, ev.clientY, colIndex);
+      }
+    }
+
+    function onUp(ev) {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      clearDropHighlight();
+
+      if (moved && stack) {
+        elList.forEach(function(cEl) { cEl.classList.remove('dragging'); });
+        var destCol = findDropColumn(ev.clientX, ev.clientY, colIndex);
+        if (destCol !== null && destCol !== colIndex) {
+          attemptMove(colIndex, cardIndex, destCol);
+        } else {
+          // snap back
+          state.selected = null;
+          layoutBoard();
+        }
+      } else {
+        // simple tap: select / deselect / move-to-selected-target
+        handleTapSelect(colIndex, cardIndex);
+      }
+    }
+
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+  }
+
+  function handleTapSelect(colIndex, cardIndex) {
+    var col = state.columns[colIndex];
+    var isTopSelectable = getMovableStack(colIndex, cardIndex) !== null;
+
+    if (state.selected) {
+      if (state.selected.col === colIndex && state.selected.index === cardIndex) {
+        clearSelection();
+        return;
+      }
+      // try move from selected to this column (use this column's index, drop logic = whole col)
+      attemptMove(state.selected.col, state.selected.index, colIndex);
+      return;
+    }
+    if (isTopSelectable) {
+      state.selected = { col: colIndex, index: cardIndex };
+      layoutBoard();
+    }
+  }
+
+  function findDropColumn(clientX, clientY, excludeCol) {
+    var rect = DOM.board.getBoundingClientRect();
+    var x = clientX - rect.left;
+    var best = null, bestDist = Infinity;
+    for (var c = 0; c < NUM_COLS; c++) {
+      var cx = colX(c) + layout.cardW / 2;
+      var dist = Math.abs(x - cx);
+      if (dist < layout.cardW * 0.7 && dist < bestDist) {
+        bestDist = dist;
+        best = c;
+      }
+    }
+    return best;
+  }
+
+  function highlightDropTarget(clientX, clientY, excludeCol) {
+    clearDropHighlight();
+    var c = findDropColumn(clientX, clientY, excludeCol);
+    if (c === null) return;
+    var col = state.columns[c];
+    if (col.length > 0) {
+      var topEl = cardElems[col[col.length - 1].id];
+      if (topEl) topEl.classList.add('highlight-drop');
+    } else {
+      DOM.emptyColHint.style.display = 'block';
+      DOM.emptyColHint.style.left = colX(c) + 'px';
+      DOM.emptyColHint.style.top = layout.topPad + 'px';
+    }
+  }
+  function clearDropHighlight() {
+    document.querySelectorAll('.highlight-drop').forEach(function(el) { el.classList.remove('highlight-drop'); });
+    DOM.emptyColHint.style.display = 'none';
+  }
+
+  /* ===================== Stock dealing ===================== */
+  function onStockClick() {
+    if (!state.stock.length) return;
+    // Spider rule: cannot deal if any column is empty
+    for (var c = 0; c < NUM_COLS; c++) {
+      if (state.columns[c].length === 0) {
+        showToast('空の列があると配れません');
+        return;
+      }
+    }
+    pushHistory();
+    var n = Math.min(NUM_COLS, state.stock.length);
+    for (var c = 0; c < n; c++) {
+      var card = state.stock.pop();
+      card.faceUp = true;
+      state.columns[c].push(card);
+    }
+    state.moves++;
+    for (var c2 = 0; c2 < NUM_COLS; c2++) tryAutoCompleteFoundation(c2);
+    layoutBoard();
+    if (checkWin()) setTimeout(showWin, 300);
+  }
+
+  /* ===================== Hint ===================== */
+  function findHint() {
+    // find any movable stack that can legally move to another column (prefer non-empty improving moves)
+    for (var c = 0; c < NUM_COLS; c++) {
+      var col = state.columns[c];
+      for (var i = 0; i < col.length; i++) {
+        if (!col[i].faceUp) continue;
+        var stack = getMovableStack(c, i);
+        if (!stack) continue;
+        for (var d = 0; d < NUM_COLS; d++) {
+          if (d === c) continue;
+          if (canPlace(stack, state.columns[d])) {
+            return { from: c, index: i, to: d };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  function showHint() {
+    var h = findHint();
+    if (!h) {
+      if (state.stock.length) showToast('動かせる手がありません。山札を引きましょう');
+      else showToast('動かせる手がありません');
+      return;
+    }
+    var card = state.columns[h.from][h.index];
+    var el = cardElems[card.id];
+    if (el) {
+      el.style.boxShadow = '0 0 0 4px #ffd54a, 0 6px 14px rgba(0,0,0,0.5)';
+      setTimeout(function() {
+        layoutBoard();
+      }, 900);
+    }
+    showToast((h.from+1) + '列目 → ' + (h.to+1) + '列目 へ移動できます');
+  }
+
+  /* ===================== Win / toast ===================== */
+  function showWin() {
+    DOM.winStats.textContent = 'スコア: ' + state.score + ' / 手数: ' + state.moves;
+    DOM.winOverlay.classList.add('show');
+  }
+  function hideWin() {
+    DOM.winOverlay.classList.remove('show');
+  }
+
+  var toastTimer = null;
+  function showToast(msg) {
+    DOM.toast.textContent = msg;
+    DOM.toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() { DOM.toast.classList.remove('show'); }, 1800);
+  }
+
+  /* ===================== UI wiring ===================== */
+  document.getElementById('btnUndo').addEventListener('click', undo);
+  document.getElementById('btnHint').addEventListener('click', showHint);
+  document.getElementById('btnNew').addEventListener('click', openMenu);
+  document.getElementById('btnWinNew').addEventListener('click', function() {
+    hideWin();
+    openMenu();
+  });
+
+  function openMenu() {
+    DOM.menuOverlay.classList.add('show');
+  }
+  function closeMenu() {
+    DOM.menuOverlay.classList.remove('show');
+  }
+
+  var selectedSuits = 2;
+  var suitButtons = document.querySelectorAll('#suitOpts button');
+  suitButtons.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      selectedSuits = parseInt(this.dataset.suits, 10);
+      suitButtons.forEach(function(b) { b.classList.remove('active'); });
+      this.classList.add('active');
+    });
+  });
+  suitButtons[1].classList.add('active'); // default 2-suit
+
+  document.getElementById('btnStart').addEventListener('click', function() {
+    closeMenu();
+    newGame(selectedSuits);
+  });
+
+  /* ===================== Boot ===================== */
+  checkOrientation();
+  buildStaticDom();
+  openMenu();
+
+  window.addEventListener('resize', function() {
+    if (state.columns.length) layoutBoard();
+  });
+
+})();
+</script>
+</body>
+</html>
