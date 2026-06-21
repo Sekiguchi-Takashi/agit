@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Google Drive / Calendar 連携チェッカー</title>
+<style>
+  :root {
+    --ok-color: #2e7d32;
+    --ng-color: #c62828;
+    --main-color: #1a73e8;
+    --bg-color: #f5f6f8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    background: var(--bg-color);
+    color: #222;
+    padding: 16px;
+  }
+  .container { max-width: 480px; margin: 0 auto; }
+  h1 { font-size: 1.25rem; margin: 0 0 4px; }
+  h2 { font-size: 1rem; margin: 0 0 10px; }
+  .subtitle { font-size: 0.85rem; color: #666; margin-bottom: 16px; }
+  .card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  }
+  label { display: block; font-size: 0.85rem; font-weight: bold; margin-bottom: 6px; color: #444; }
+  input[type="text"], input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    margin-bottom: 4px;
+  }
+  .hint { font-size: 0.75rem; color: #888; margin-bottom: 12px; }
+  .hint a { color: var(--main-color); }
+  .secret-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .secret-row input { margin-bottom: 0; }
+  .secret-row button {
+    flex: 0 0 auto;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    background: #fff;
+    font-size: 0.85rem;
+  }
+  button.primary {
+    width: 100%;
+    padding: 14px;
+    font-size: 1rem;
+    font-weight: bold;
+    color: #fff;
+    background: var(--main-color);
+    border: none;
+    border-radius: 8px;
+    margin-top: 4px;
+  }
+  button.primary:disabled { background: #9ab8e8; }
+  button.secondary {
+    width: 100%;
+    padding: 12px;
+    font-size: 0.95rem;
+    color: var(--main-color);
+    background: #eef3fd;
+    border: none;
+    border-radius: 8px;
+    margin-top: 8px;
+  }
+  button.secondary:disabled { color: #aaa; background: #f0f0f0; }
+  .result-box {
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 8px;
+    font-size: 0.88rem;
+    display: none;
+  }
+  .result-box.ok { background: #e6f4ea; color: var(--ok-color); display: block; }
+  .result-box.ng { background: #fdecea; color: var(--ng-color); display: block; }
+  .result-box.pending { background: #fff8e1; color: #8a6d00; display: block; }
+  .result-box.skip { background: #f0f0f0; color: #777; display: block; }
+  details { margin-top: 8px; }
+  pre {
+    white-space: pre-wrap;
+    word-break: break-all;
+    background: #f1f1f1;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+  }
+  .count-display {
+    margin-top: 10px;
+    padding: 12px;
+    border-radius: 8px;
+    background: #f5f6f8;
+    text-align: center;
+    font-size: 1rem;
+    font-weight: bold;
+    color: #555;
+  }
+  .count-display.ok { color: var(--main-color); }
+  .count-display .num { font-size: 1.6rem; }
+  footer { font-size: 0.7rem; color: #999; text-align: center; margin: 24px 0 8px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Google Drive / Calendar 連携チェッカー</h1>
+  <div class="subtitle">アクセストークンがHTML/JavaScriptから正常に利用できるかを確認します。</div>
+
+  <div class="card">
+    <h2>Google Drive</h2>
+    <label for="driveToken">アクセストークン（OAuth2／省略可）</label>
+    <div class="secret-row">
+      <input type="password" id="driveToken" placeholder="ya29.... で始まるアクセストークン" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <button type="button" id="toggleDriveToken">表示</button>
+    </div>
+    <div class="hint">必要スコープ: <code>drive.readonly</code>（フォルダ一覧の取得に使用）</div>
+    <div class="result-box" id="driveResult"></div>
+    <div class="count-display" id="driveCount">フォルダ数: -</div>
+  </div>
+
+  <div class="card">
+    <h2>Google Calendar</h2>
+    <label for="calendarToken">アクセストークン（OAuth2／省略可）</label>
+    <div class="secret-row">
+      <input type="password" id="calendarToken" placeholder="ya29.... で始まるアクセストークン" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <button type="button" id="toggleCalendarToken">表示</button>
+    </div>
+    <div class="hint">必要スコープ: <code>calendar.readonly</code>（本日の予定の取得に使用）</div>
+    <div class="result-box" id="calendarResult"></div>
+    <div class="count-display" id="calendarCount">本日の予定の件数: -</div>
+  </div>
+
+  <div class="card">
+    <button class="primary" id="runBtn">テスト実行</button>
+    <button class="secondary" id="saveBtn" disabled>チェックファイルを保存（内部ストレージ/Documents推奨）</button>
+  </div>
+
+  <footer>
+    入力したトークンはこの端末からGoogleのAPIに直接送信されるだけで、どこにも保存・送信されません。<br>
+    保存したチェックファイルにはトークンの一部のみ記録されます。
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var driveToken = document.getElementById("driveToken");
+  var calendarToken = document.getElementById("calendarToken");
+  var toggleDriveBtn = document.getElementById("toggleDriveToken");
+  var toggleCalendarBtn = document.getElementById("toggleCalendarToken");
+  var driveResult = document.getElementById("driveResult");
+  var calendarResult = document.getElementById("calendarResult");
+  var driveCount = document.getElementById("driveCount");
+  var calendarCount = document.getElementById("calendarCount");
+  var runBtn = document.getElementById("runBtn");
+  var saveBtn = document.getElementById("saveBtn");
+
+  var lastResult = null; // 直前の実行結果（保存ボタンはこの内容を1ファイルにまとめる）
+
+  function bindToggle(btn, input) {
+    btn.addEventListener("click", function () {
+      var hidden = input.type === "password";
+      input.type = hidden ? "text" : "password";
+      btn.textContent = hidden ? "非表示" : "表示";
+    });
+  }
+  bindToggle(toggleDriveBtn, driveToken);
+  bindToggle(toggleCalendarBtn, calendarToken);
+
+  function maskSecret(s) {
+    if (!s) return "";
+    if (s.length <= 8) return "*".repeat(s.length);
+    return s.slice(0, 4) + "*".repeat(Math.max(4, s.length - 8)) + s.slice(-4);
+  }
+
+  async function safeJson(res) {
+    try { return await res.json(); }
+    catch (e) { return null; }
+  }
+
+  // --- Google Drive: 接続確認＋フォルダ数カウント -----------------
+
+  async function testDrive(token) {
+    var folders = 0;
+    var pageToken = "";
+    var pages = 0;
+    do {
+      var url = new URL("https://www.googleapis.com/drive/v3/files");
+      url.searchParams.set("q", "mimeType='application/vnd.google-apps.folder' and trashed=false");
+      url.searchParams.set("fields", "nextPageToken,files(id)");
+      url.searchParams.set("pageSize", "1000");
+      if (pageToken) url.searchParams.set("pageToken", pageToken);
+
+      var res = await fetch(url.toString(), { headers: { Authorization: "Bearer " + token } });
+      var body = await safeJson(res);
+      if (!res.ok) {
+        return { ok: false, summary: "Google Drive APIエラー (HTTP " + res.status + ")", detail: body, count: null };
+      }
+      folders += (body.files || []).length;
+      pageToken = body.nextPageToken || "";
+      pages++;
+    } while (pageToken && pages < 10);
+
+    return { ok: true, summary: "Google Driveに正常に接続できました", detail: null, count: folders };
+  }
+
+  // --- Google Calendar: 接続確認＋本日の予定の件数カウント ----------
+
+  async function testCalendar(token) {
+    var now = new Date();
+    var start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    var end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0);
+
+    var events = 0;
+    var pageToken = "";
+    var pages = 0;
+    do {
+      var url = new URL("https://www.googleapis.com/calendar/v3/calendars/primary/events");
+      url.searchParams.set("timeMin", start.toISOString());
+      url.searchParams.set("timeMax", end.toISOString());
+      url.searchParams.set("singleEvents", "true");
+      url.searchParams.set("maxResults", "2500");
+      if (pageToken) url.searchParams.set("pageToken", pageToken);
+
+      var res = await fetch(url.toString(), { headers: { Authorization: "Bearer " + token } });
+      var body = await safeJson(res);
+      if (!res.ok) {
+        return { ok: false, summary: "Google Calendar APIエラー (HTTP " + res.status + ")", detail: body, count: null };
+      }
+      events += (body.items || []).length;
+      pageToken = body.nextPageToken || "";
+      pages++;
+    } while (pageToken && pages < 5);
+
+    return { ok: true, summary: "Google Calendarに正常に接続できました", detail: null, count: events };
+  }
+
+  // --- 表示処理 -----------------------------------------------------
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function renderResult(box, state, summary, detail) {
+    box.className = "result-box " + state;
+    var html = "<strong>" + summary + "</strong>";
+    if (detail) {
+      html += "<details><summary>詳細を見る</summary><pre>" + escapeHtml(JSON.stringify(detail, null, 2)) + "</pre></details>";
+    }
+    box.innerHTML = html;
+  }
+
+  function renderCount(box, label, value, ok) {
+    box.className = "count-display" + (ok ? " ok" : "");
+    box.innerHTML = label + ': <span class="num">' + (value === null ? "-" : value + "件") + "</span>";
+  }
+
+  // --- 実行・保存 -----------------------------------------------------
+
+  runBtn.addEventListener("click", async function () {
+    runBtn.disabled = true;
+    saveBtn.disabled = true;
+    runBtn.textContent = "テスト実行中...";
+
+    var dToken = driveToken.value.trim();
+    var cToken = calendarToken.value.trim();
+
+    var driveRun, calendarRun;
+
+    if (dToken) {
+      renderResult(driveResult, "pending", "テスト中です…", null);
+      driveRun = await (async function () {
+        try { return await testDrive(dToken); }
+        catch (e) { return { ok: false, summary: "通信エラーが発生しました", detail: String(e), count: null }; }
+      })();
+    } else {
+      driveRun = { skipped: true, summary: "トークンが未入力のためスキップしました", count: null };
+    }
+
+    if (cToken) {
+      renderResult(calendarResult, "pending", "テスト中です…", null);
+      calendarRun = await (async function () {
+        try { return await testCalendar(cToken); }
+        catch (e) { return { ok: false, summary: "通信エラーが発生しました", detail: String(e), count: null }; }
+      })();
+    } else {
+      calendarRun = { skipped: true, summary: "トークンが未入力のためスキップしました", count: null };
+    }
+
+    if (driveRun.skipped) {
+      renderResult(driveResult, "skip", driveRun.summary, null);
+    } else {
+      renderResult(driveResult, driveRun.ok ? "ok" : "ng", driveRun.summary, driveRun.detail);
+    }
+    renderCount(driveCount, "フォルダ数", driveRun.count, !!driveRun.ok);
+
+    if (calendarRun.skipped) {
+      renderResult(calendarResult, "skip", calendarRun.summary, null);
+    } else {
+      renderResult(calendarResult, calendarRun.ok ? "ok" : "ng", calendarRun.summary, calendarRun.detail);
+    }
+    renderCount(calendarCount, "本日の予定の件数", calendarRun.count, !!calendarRun.ok);
+
+    lastResult = {
+      timestamp: new Date().toLocaleString("ja-JP"),
+      drive: { tokenMasked: maskSecret(dToken), run: driveRun },
+      calendar: { tokenMasked: maskSecret(cToken), run: calendarRun }
+    };
+
+    runBtn.disabled = false;
+    runBtn.textContent = "テスト実行";
+    saveBtn.disabled = false;
+  });
+
+  function describeRun(run) {
+    if (run.skipped) return "未テスト（トークン未入力）";
+    return run.ok ? "OK" : "NG";
+  }
+
+  function buildCheckFileContent() {
+    var r = lastResult;
+    var lines = [];
+    lines.push("Google Drive / Calendar 連携チェック結果");
+    lines.push("作成日時: " + r.timestamp);
+    lines.push("----------------------------------------");
+    lines.push("[Google Drive]");
+    lines.push("使用トークン: " + (r.drive.tokenMasked || "(未入力)"));
+    lines.push("接続結果: " + describeRun(r.drive.run));
+    lines.push("フォルダ数: " + (r.drive.run.count === null ? "-" : r.drive.run.count + "件"));
+    lines.push("詳細: " + r.drive.run.summary);
+    if (r.drive.run.detail) lines.push("APIレスポンス: " + JSON.stringify(r.drive.run.detail));
+    lines.push("");
+    lines.push("[Google Calendar]");
+    lines.push("使用トークン: " + (r.calendar.tokenMasked || "(未入力)"));
+    lines.push("接続結果: " + describeRun(r.calendar.run));
+    lines.push("本日の予定の件数: " + (r.calendar.run.count === null ? "-" : r.calendar.run.count + "件"));
+    lines.push("詳細: " + r.calendar.run.summary);
+    if (r.calendar.run.detail) lines.push("APIレスポンス: " + JSON.stringify(r.calendar.run.detail));
+    lines.push("");
+    return lines.join("\n");
+  }
+
+  saveBtn.addEventListener("click", function () {
+    if (!lastResult) return;
+    var content = buildCheckFileContent();
+    var blob = new Blob([content], { type: "text/plain" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    var ts = new Date();
+    function pad(n) { return String(n).padStart(2, "0"); }
+    var fname = "check_drive_calendar_" + ts.getFullYear() + pad(ts.getMonth() + 1) + pad(ts.getDate()) + "_" + pad(ts.getHours()) + pad(ts.getMinutes()) + pad(ts.getSeconds()) + ".txt";
+    a.href = url;
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+})();
+</script>
+</body>
+</html>
