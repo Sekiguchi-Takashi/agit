@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>人生年表メモリー</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- トップページ -->
+  <section id="page-top" class="page">
+    <h1>人生年表メモリー</h1>
+    <p class="lead">生まれた年を入力すると、その年から今年までの年表ページを作成します。</p>
+    <div class="top-form">
+      <label for="birth-year-input">生まれた年(西暦)</label>
+      <input type="number" id="birth-year-input" placeholder="例: 1990" inputmode="numeric">
+      <button id="execute-btn" class="btn btn-primary">実行</button>
+    </div>
+    <p id="top-message" class="message"></p>
+  </section>
+
+  <!-- 経歴ページ -->
+  <section id="page-career" class="page">
+    <header class="career-header">
+      <h2>経歴</h2>
+      <button id="career-save-btn" class="btn btn-primary">保存</button>
+    </header>
+    <p id="career-save-status" class="save-status" aria-live="polite"></p>
+    <div id="career-list" class="career-list"></div>
+  </section>
+
+  <!-- 年別ページ -->
+  <section id="page-year" class="page">
+    <div class="year-row1">
+      <div id="year-label" class="year-label"></div>
+      <button id="year-save-btn" class="btn btn-primary">保存</button>
+    </div>
+    <div class="year-row2">
+      <div id="year-career-display" class="year-career-display"></div>
+    </div>
+    <div class="year-row3">
+      <textarea id="year-comment" class="year-comment" placeholder="コメントを自由に入力..." rows="1"></textarea>
+      <button id="year-back-btn" class="btn btn-secondary">戻る</button>
+    </div>
+    <p id="year-save-status" class="save-status" aria-live="polite"></p>
+  </section>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
