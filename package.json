@@ -1,0 +1,10 @@
+{
+  "name": "budget-memo-app",
+  "version": "1.0.0",
+  "description": "Termux Node.js上で動くローカル家計簿・メモアプリ",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "MIT"
+}

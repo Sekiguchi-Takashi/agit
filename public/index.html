@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家計簿・メモ</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --border: #e0e0e0;
+    --text: #222;
+    --sub: #777;
+    --income: #1a7a3c;
+    --expense: #c0392b;
+    --accent: #2d6cdf;
+    --accent-dark: #1f51ab;
+    --danger: #c0392b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+  }
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+  }
+  h1 {
+    margin: 0;
+    padding: 14px 16px 8px;
+    font-size: 18px;
+  }
+  .tabs {
+    display: flex;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 12px 0;
+    font-size: 16px;
+    font-weight: 600;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--sub);
+    cursor: pointer;
+  }
+  .tab-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  main {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 12px 12px 80px;
+  }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+
+  .summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    text-align: center;
+  }
+  .summary div .label { font-size: 12px; color: var(--sub); }
+  .summary div .value { font-size: 16px; font-weight: 700; margin-top: 2px; word-break: break-all; }
+  .summary .income .value { color: var(--income); }
+  .summary .expense .value { color: var(--expense); }
+
+  form .row {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 10px;
+  }
+  label {
+    font-size: 12px;
+    color: var(--sub);
+    margin-bottom: 4px;
+  }
+  input, select, textarea {
+    font-size: 16px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text);
+    width: 100%;
+  }
+  textarea { resize: vertical; min-height: 70px; font-family: inherit; }
+
+  .type-toggle {
+    display: flex;
+    gap: 8px;
+  }
+  .type-toggle label {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--sub);
+    margin-bottom: 0;
+    cursor: pointer;
+  }
+  .type-toggle input { display: none; }
+  .type-toggle input:checked + span { color: inherit; }
+  .type-toggle label.income-label:has(input:checked) { background: #e8f6ec; border-color: var(--income); color: var(--income); }
+  .type-toggle label.expense-label:has(input:checked) { background: #fbeae8; border-color: var(--expense); color: var(--expense); }
+
+  button.primary {
+    width: 100%;
+    padding: 13px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  button.primary:active { background: var(--accent-dark); }
+
+  .list-item {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+    background: #fff;
+  }
+  .item-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .item-date { font-size: 12px; color: var(--sub); }
+  .item-amount { font-size: 18px; font-weight: 700; }
+  .item-amount.income { color: var(--income); }
+  .item-amount.expense { color: var(--expense); }
+  .item-category {
+    display: inline-block;
+    font-size: 12px;
+    background: #eef2fb;
+    color: var(--accent-dark);
+    padding: 2px 8px;
+    border-radius: 100px;
+    margin-top: 6px;
+  }
+  .item-memo { font-size: 14px; color: var(--text); margin-top: 6px; white-space: pre-wrap; word-break: break-word; }
+  .item-actions { margin-top: 8px; display: flex; gap: 8px; }
+  .btn-sm {
+    font-size: 13px;
+    padding: 7px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #fafafa;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .btn-sm.danger { color: var(--danger); border-color: #f1c1bd; background: #fdf3f2; }
+
+  .memo-title { font-size: 16px; font-weight: 700; }
+  .memo-body { font-size: 14px; margin-top: 6px; white-space: pre-wrap; word-break: break-word; color: var(--text); }
+  .memo-meta { font-size: 11px; color: var(--sub); margin-top: 6px; }
+
+  .empty {
+    text-align: center;
+    color: var(--sub);
+    padding: 24px 0;
+    font-size: 14px;
+  }
+
+  .section-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--sub);
+    margin: 18px 4px 8px;
+  }
+
+  dialog {
+    border: none;
+    border-radius: 12px;
+    padding: 0;
+    width: 90%;
+    max-width: 420px;
+  }
+  dialog .card { margin-bottom: 0; border: none; }
+  dialog::backdrop { background: rgba(0,0,0,0.4); }
+  .dialog-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .dialog-actions button { flex: 1; }
+  button.secondary {
+    width: 100%;
+    padding: 13px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    background: #f0f0f0;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>家計簿・メモ</h1>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="budget">家計簿</button>
+    <button class="tab-btn" data-tab="memo">メモ</button>
+  </div>
+</header>
+
+<main>
+  <!-- 家計簿タブ -->
+  <section id="view-budget" class="view active">
+    <div class="card">
+      <div class="summary">
+        <div class="income">
+          <div class="label">収入合計</div>
+          <div class="value" id="total-income">¥0</div>
+        </div>
+        <div class="expense">
+          <div class="label">支出合計</div>
+          <div class="value" id="total-expense">¥0</div>
+        </div>
+        <div class="balance">
+          <div class="label">残高</div>
+          <div class="value" id="total-balance">¥0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <form id="budget-form">
+        <div class="row">
+          <label>種別</label>
+          <div class="type-toggle">
+            <label class="income-label">
+              <input type="radio" name="type" value="income" checked>
+              <span>収入</span>
+            </label>
+            <label class="expense-label">
+              <input type="radio" name="type" value="expense">
+              <span>支出</span>
+            </label>
+          </div>
+        </div>
+        <div class="row">
+          <label for="b-date">日付</label>
+          <input type="date" id="b-date" required>
+        </div>
+        <div class="row">
+          <label for="b-category">カテゴリ</label>
+          <input type="text" id="b-category" placeholder="例: 食費、給料" required>
+        </div>
+        <div class="row">
+          <label for="b-amount">金額</label>
+          <input type="number" id="b-amount" min="0" step="1" inputmode="numeric" placeholder="0" required>
+        </div>
+        <div class="row">
+          <label for="b-memo">メモ（任意）</label>
+          <textarea id="b-memo" placeholder="メモ"></textarea>
+        </div>
+        <button type="submit" class="primary">登録する</button>
+      </form>
+    </div>
+
+    <div class="section-title">登録履歴</div>
+    <div id="budget-list"></div>
+  </section>
+
+  <!-- メモタブ -->
+  <section id="view-memo" class="view">
+    <div class="card">
+      <form id="memo-form">
+        <div class="row">
+          <label for="m-title">タイトル</label>
+          <input type="text" id="m-title" placeholder="タイトル" required>
+        </div>
+        <div class="row">
+          <label for="m-body">本文</label>
+          <textarea id="m-body" placeholder="本文"></textarea>
+        </div>
+        <button type="submit" class="primary">追加する</button>
+      </form>
+    </div>
+
+    <div class="section-title">メモ一覧</div>
+    <div id="memo-list"></div>
+  </section>
+</main>
+
+<dialog id="edit-dialog">
+  <div class="card">
+    <form id="edit-form">
+      <div class="row">
+        <label for="edit-title">タイトル</label>
+        <input type="text" id="edit-title" required>
+      </div>
+      <div class="row">
+        <label for="edit-body">本文</label>
+        <textarea id="edit-body"></textarea>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="secondary" id="edit-cancel">キャンセル</button>
+        <button type="submit" class="primary">保存する</button>
+      </div>
+    </form>
+  </div>
+</dialog>
+
+<script>
+const fmt = (n) => '¥' + Number(n).toLocaleString('ja-JP');
+
+// ---- タブ切り替え ----
+document.querySelectorAll('.tab-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('view-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ---- 家計簿 ----
+const budgetForm = document.getElementById('budget-form');
+const budgetList = document.getElementById('budget-list');
+const totalIncomeEl = document.getElementById('total-income');
+const totalExpenseEl = document.getElementById('total-expense');
+const totalBalanceEl = document.getElementById('total-balance');
+
+document.getElementById('b-date').valueAsDate = new Date();
+
+async function loadBudget() {
+  const res = await fetch('/api/budget');
+  const entries = await res.json();
+  renderBudget(entries);
+}
+
+function renderBudget(entries) {
+  const sorted = [...entries].sort((a, b) => {
+    if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+    return (b.createdAt || 0) - (a.createdAt || 0);
+  });
+
+  let income = 0, expense = 0;
+  for (const e of entries) {
+    if (e.type === 'income') income += Number(e.amount);
+    else expense += Number(e.amount);
+  }
+  totalIncomeEl.textContent = fmt(income);
+  totalExpenseEl.textContent = fmt(expense);
+  totalBalanceEl.textContent = fmt(income - expense);
+
+  if (sorted.length === 0) {
+    budgetList.innerHTML = '<div class="empty">まだ登録がありません</div>';
+    return;
+  }
+
+  budgetList.innerHTML = sorted.map((e) => `
+    <div class="list-item" data-id="${e.id}">
+      <div class="item-top">
+        <span class="item-date">${e.date}</span>
+        <span class="item-amount ${e.type}">${e.type === 'income' ? '+' : '-'}${fmt(e.amount)}</span>
+      </div>
+      <span class="item-category">${escapeHtml(e.category)}</span>
+      ${e.memo ? `<div class="item-memo">${escapeHtml(e.memo)}</div>` : ''}
+      <div class="item-actions">
+        <button class="btn-sm danger" data-action="delete-budget" data-id="${e.id}">削除</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+budgetForm.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const type = budgetForm.querySelector('input[name="type"]:checked').value;
+  const date = document.getElementById('b-date').value;
+  const category = document.getElementById('b-category').value.trim();
+  const amount = document.getElementById('b-amount').value;
+  const memo = document.getElementById('b-memo').value.trim();
+  if (!date || !category || amount === '') return;
+
+  const res = await fetch('/api/budget', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type, date, category, amount, memo }),
+  });
+  if (res.ok) {
+    budgetForm.reset();
+    document.getElementById('b-date').valueAsDate = new Date();
+    budgetForm.querySelector('input[name="type"][value="income"]').checked = true;
+    loadBudget();
+  } else {
+    alert('登録に失敗しました');
+  }
+});
+
+budgetList.addEventListener('click', async (ev) => {
+  const btn = ev.target.closest('[data-action="delete-budget"]');
+  if (!btn) return;
+  if (!confirm('この項目を削除しますか？')) return;
+  const res = await fetch('/api/budget/' + btn.dataset.id, { method: 'DELETE' });
+  if (res.ok) loadBudget();
+});
+
+// ---- メモ ----
+const memoForm = document.getElementById('memo-form');
+const memoList = document.getElementById('memo-list');
+const editDialog = document.getElementById('edit-dialog');
+const editForm = document.getElementById('edit-form');
+let editingId = null;
+
+async function loadMemos() {
+  const res = await fetch('/api/memos');
+  const memos = await res.json();
+  renderMemos(memos);
+}
+
+function renderMemos(memos) {
+  const sorted = [...memos].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+  if (sorted.length === 0) {
+    memoList.innerHTML = '<div class="empty">まだメモがありません</div>';
+    return;
+  }
+
+  memoList.innerHTML = sorted.map((m) => `
+    <div class="list-item" data-id="${m.id}">
+      <div class="memo-title">${escapeHtml(m.title)}</div>
+      ${m.body ? `<div class="memo-body">${escapeHtml(m.body)}</div>` : ''}
+      <div class="memo-meta">更新: ${formatDate(m.updatedAt)}</div>
+      <div class="item-actions">
+        <button class="btn-sm" data-action="edit-memo" data-id="${m.id}">編集</button>
+        <button class="btn-sm danger" data-action="delete-memo" data-id="${m.id}">削除</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function formatDate(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return d.toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+memoForm.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const title = document.getElementById('m-title').value.trim();
+  const body = document.getElementById('m-body').value;
+  if (!title) return;
+
+  const res = await fetch('/api/memos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, body }),
+  });
+  if (res.ok) {
+    memoForm.reset();
+    loadMemos();
+  } else {
+    alert('追加に失敗しました');
+  }
+});
+
+memoList.addEventListener('click', async (ev) => {
+  const editBtn = ev.target.closest('[data-action="edit-memo"]');
+  const delBtn = ev.target.closest('[data-action="delete-memo"]');
+
+  if (delBtn) {
+    if (!confirm('このメモを削除しますか？')) return;
+    const res = await fetch('/api/memos/' + delBtn.dataset.id, { method: 'DELETE' });
+    if (res.ok) loadMemos();
+    return;
+  }
+
+  if (editBtn) {
+    const item = editBtn.closest('.list-item');
+    editingId = editBtn.dataset.id;
+    const title = item.querySelector('.memo-title').textContent;
+    const bodyEl = item.querySelector('.memo-body');
+    document.getElementById('edit-title').value = title;
+    document.getElementById('edit-body').value = bodyEl ? bodyEl.textContent : '';
+    editDialog.showModal();
+  }
+});
+
+document.getElementById('edit-cancel').addEventListener('click', () => {
+  editDialog.close();
+  editingId = null;
+});
+
+editForm.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const title = document.getElementById('edit-title').value.trim();
+  const body = document.getElementById('edit-body').value;
+  if (!title || !editingId) return;
+
+  const res = await fetch('/api/memos/' + editingId, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, body }),
+  });
+  if (res.ok) {
+    editDialog.close();
+    editingId = null;
+    loadMemos();
+  } else {
+    alert('保存に失敗しました');
+  }
+});
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+loadBudget();
+loadMemos();
+</script>
+</body>
+</html>
