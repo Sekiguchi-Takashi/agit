@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ローカルLLMチャット</title>
+<style>
+  :root {
+    --bg: #111317;
+    --bubble-user: #2563eb;
+    --bubble-assistant: #2a2d34;
+    --text: #f1f1f1;
+    --muted: #9aa0a6;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  }
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: #1b1d23;
+    border-bottom: 1px solid #2a2d34;
+    flex-shrink: 0;
+  }
+  header h1 {
+    font-size: 16px;
+    margin: 0;
+    font-weight: 600;
+  }
+  header .model {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  #clearBtn {
+    background: #3a1d1d;
+    color: #ff8a8a;
+    border: 1px solid #5a2a2a;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  #error {
+    display: none;
+    background: #3a1d1d;
+    color: #ff8a8a;
+    padding: 8px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid #5a2a2a;
+    white-space: pre-wrap;
+    flex-shrink: 0;
+  }
+  #chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .msg {
+    max-width: 85%;
+    padding: 8px 12px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .msg.user {
+    align-self: flex-end;
+    background: var(--bubble-user);
+    color: #fff;
+    border-bottom-right-radius: 2px;
+  }
+  .msg.assistant {
+    align-self: flex-start;
+    background: var(--bubble-assistant);
+    color: var(--text);
+    border-bottom-left-radius: 2px;
+  }
+  .msg.assistant.pending::after {
+    content: '...';
+    color: var(--muted);
+  }
+  form#inputBar {
+    display: flex;
+    gap: 8px;
+    padding: 10px;
+    background: #1b1d23;
+    border-top: 1px solid #2a2d34;
+    flex-shrink: 0;
+  }
+  #input {
+    flex: 1;
+    resize: none;
+    border-radius: 18px;
+    border: 1px solid #2a2d34;
+    background: #14161a;
+    color: var(--text);
+    padding: 10px 14px;
+    font-size: 14px;
+    max-height: 100px;
+    font-family: inherit;
+  }
+  #input:focus {
+    outline: none;
+    border-color: var(--bubble-user);
+  }
+  #sendBtn {
+    background: var(--bubble-user);
+    color: #fff;
+    border: none;
+    border-radius: 18px;
+    padding: 0 18px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  #sendBtn:disabled {
+    background: #3a3d44;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div>
+      <h1>ローカルLLMチャット</h1>
+      <div class="model" id="modelLabel"></div>
+    </div>
+    <button id="clearBtn" type="button">履歴クリア</button>
+  </header>
+  <div id="error"></div>
+  <div id="chat"></div>
+  <form id="inputBar">
+    <textarea id="input" rows="1" placeholder="メッセージを入力..." autocomplete="off"></textarea>
+    <button id="sendBtn" type="submit">送信</button>
+  </form>
+</div>
+<script>
+(function () {
+  const chatEl = document.getElementById('chat');
+  const inputEl = document.getElementById('input');
+  const sendBtn = document.getElementById('sendBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const errorEl = document.getElementById('error');
+  const formEl = document.getElementById('inputBar');
+  const modelLabel = document.getElementById('modelLabel');
+
+  let sending = false;
+
+  function showError(message) {
+    errorEl.textContent = message;
+    errorEl.style.display = 'block';
+  }
+
+  function hideError() {
+    errorEl.style.display = 'none';
+    errorEl.textContent = '';
+  }
+
+  function scrollToBottom() {
+    chatEl.scrollTop = chatEl.scrollHeight;
+  }
+
+  function appendMessage(role, text) {
+    const el = document.createElement('div');
+    el.className = 'msg ' + role;
+    el.textContent = text;
+    chatEl.appendChild(el);
+    scrollToBottom();
+    return el;
+  }
+
+  function renderHistory(history) {
+    chatEl.innerHTML = '';
+    history.forEach(function (m) {
+      if (m.role === 'user' || m.role === 'assistant') {
+        appendMessage(m.role, m.content);
+      }
+    });
+  }
+
+  function setSending(value) {
+    sending = value;
+    sendBtn.disabled = value;
+    inputEl.disabled = value;
+  }
+
+  async function loadModel() {
+    try {
+      const res = await fetch('/api/model');
+      const data = await res.json();
+      modelLabel.textContent = 'モデル: ' + data.model;
+    } catch (err) {
+      modelLabel.textContent = '';
+    }
+  }
+
+  async function loadHistory() {
+    try {
+      const res = await fetch('/api/history');
+      if (!res.ok) throw new Error('履歴の取得に失敗しました');
+      const history = await res.json();
+      renderHistory(history);
+    } catch (err) {
+      showError('サーバーに接続できません。server.js が起動しているか確認してください。');
+    }
+  }
+
+  async function sendMessage(text) {
+    appendMessage('user', text);
+    setSending(true);
+    hideError();
+
+    const assistantEl = appendMessage('assistant', '');
+    assistantEl.classList.add('pending');
+    let assistantText = '';
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+      });
+
+      if (!res.ok || !res.body) {
+        let message = 'エラーが発生しました (HTTP ' + res.status + ')';
+        try {
+          const data = await res.json();
+          if (data && data.error) message = data.error;
+        } catch (e) {}
+        showError(message);
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          let json;
+          try {
+            json = JSON.parse(line);
+          } catch (e) {
+            continue;
+          }
+          if (json.content) {
+            assistantText += json.content;
+            assistantEl.textContent = assistantText;
+            assistantEl.classList.remove('pending');
+            scrollToBottom();
+          }
+          if (json.error) {
+            showError(json.error);
+          }
+        }
+      }
+    } catch (err) {
+      showError('サーバーに接続できません。server.js が起動しているか確認してください。');
+    } finally {
+      if (!assistantText) {
+        assistantEl.remove();
+      } else {
+        assistantEl.classList.remove('pending');
+      }
+      setSending(false);
+    }
+  }
+
+  formEl.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (sending) return;
+    const text = inputEl.value.trim();
+    if (!text) return;
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    sendMessage(text);
+  });
+
+  inputEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      formEl.requestSubmit();
+    }
+  });
+
+  inputEl.addEventListener('input', function () {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 100) + 'px';
+  });
+
+  clearBtn.addEventListener('click', async function () {
+    if (sending) return;
+    if (!confirm('会話履歴を削除しますか？')) return;
+    try {
+      const res = await fetch('/api/clear', { method: 'POST' });
+      if (!res.ok) throw new Error('履歴の削除に失敗しました');
+      chatEl.innerHTML = '';
+      hideError();
+    } catch (err) {
+      showError('履歴の削除に失敗しました。');
+    }
+  });
+
+  loadModel();
+  loadHistory();
+})();
+</script>
+</body>
+</html>
