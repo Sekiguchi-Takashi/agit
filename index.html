@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Win11 キッティングチェックリスト</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <h1>Windows 11 Pro 24H2<br>キッティングチェックリスト</h1>
+    <p class="lead">Microsoftアカウントに紐づけずにセットアップする際の設定項目を、セキュリティレベル別にチェックできます。</p>
+  </header>
+
+  <main class="top-main">
+    <section class="level-select">
+      <h2>セキュリティレベルを選択</h2>
+      <a class="level-btn level-high" href="checklist.html?level=high">
+        <span class="level-name">高</span>
+        <span class="level-desc">推奨設定をすべて適用する、最も厳格なセキュリティ構成です。</span>
+      </a>
+      <a class="level-btn level-medium" href="checklist.html?level=medium">
+        <span class="level-name">中</span>
+        <span class="level-desc">セキュリティと利便性のバランスを取った構成です。</span>
+      </a>
+      <a class="level-btn level-low" href="checklist.html?level=low">
+        <span class="level-name">低</span>
+        <span class="level-desc">最低限必要な基本設定のみを適用します。</span>
+      </a>
+    </section>
+
+    <section class="custom-select">
+      <a class="custom-btn" href="checklist.html?level=custom">項目を自分でカスタマイズする</a>
+      <p class="custom-note">全項目を表示し、個別にチェックのON/OFFを選択できます。</p>
+    </section>
+  </main>
+</div>
+</body>
+</html>

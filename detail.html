@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>設定変更手順</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="app">
+  <header class="app-header sub-header">
+    <a class="back-link" id="back-link" href="checklist.html">← チェックリストへ戻る</a>
+    <h1 id="item-title">設定変更手順</h1>
+    <p id="item-summary" class="lead"></p>
+  </header>
+  <main class="detail-main">
+    <ol id="step-list" class="step-list"></ol>
+    <label class="complete-toggle">
+      <input type="checkbox" id="complete-checkbox">
+      <span>この設定をチェックリストで完了にする</span>
+    </label>
+  </main>
+</div>
+<script src="assets/data.js"></script>
+<script src="assets/storage.js"></script>
+<script src="assets/detail.js"></script>
+</body>
+</html>

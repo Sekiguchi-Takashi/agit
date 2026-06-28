@@ -1,0 +1,273 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #f3f4f6;
+  color: #1f2937;
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", "Segoe UI", Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+.app {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: #f3f4f6;
+}
+
+.app-header {
+  background: #1f2937;
+  color: #ffffff;
+  padding: 24px 20px 20px;
+}
+
+.app-header h1 {
+  margin: 0 0 8px;
+  font-size: 1.3rem;
+  line-height: 1.4;
+}
+
+.app-header .lead {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #d1d5db;
+  line-height: 1.5;
+}
+
+.sub-header {
+  padding: 16px 20px 18px;
+}
+
+.back-link {
+  display: inline-block;
+  color: #93c5fd;
+  text-decoration: none;
+  font-size: 0.85rem;
+  margin-bottom: 10px;
+}
+
+.back-link:active {
+  opacity: 0.7;
+}
+
+/* ---- 画面A: トップページ ---- */
+
+.top-main {
+  padding: 20px;
+}
+
+.level-select h2 {
+  font-size: 1rem;
+  margin: 0 0 12px;
+  color: #374151;
+}
+
+.level-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  text-decoration: none;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  min-height: 44px;
+}
+
+.level-btn:active {
+  opacity: 0.85;
+}
+
+.level-btn .level-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.level-btn .level-desc {
+  font-size: 0.82rem;
+  opacity: 0.95;
+  line-height: 1.4;
+}
+
+.level-high {
+  background: #d64545;
+}
+
+.level-medium {
+  background: #d6912a;
+}
+
+.level-low {
+  background: #3f9142;
+}
+
+.custom-select {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.custom-btn {
+  display: inline-block;
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: #3a6ea5;
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.95rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  min-height: 44px;
+}
+
+.custom-btn:active {
+  opacity: 0.85;
+}
+
+.custom-note {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+/* ---- 画面B: チェックリスト ---- */
+
+.progress-text {
+  margin: 4px 0 8px;
+  font-size: 0.85rem;
+  color: #d1d5db;
+}
+
+.progress-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: #374151;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: #4ade80;
+  transition: width 0.2s ease;
+}
+
+.checklist-main {
+  padding: 16px 16px 32px;
+}
+
+.category-section {
+  margin-bottom: 20px;
+}
+
+.category-heading {
+  font-size: 0.95rem;
+  color: #374151;
+  margin: 0 0 8px;
+  padding-left: 4px;
+}
+
+.item-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: #ffffff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #f0f1f3;
+}
+
+.item-row:last-child {
+  border-bottom: none;
+}
+
+.item-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.item-checkbox-label input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: #3a6ea5;
+}
+
+.item-title {
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.item-detail-link {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  color: #3a6ea5;
+  text-decoration: none;
+  white-space: nowrap;
+  padding: 6px 4px;
+}
+
+.item-detail-link:active {
+  opacity: 0.7;
+}
+
+/* ---- 画面C: 設定手順 ---- */
+
+.detail-main {
+  padding: 16px 20px 32px;
+}
+
+.step-list {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px 16px 16px 36px;
+  margin: 0 0 20px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.step-list li {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.step-list li:last-child {
+  margin-bottom: 0;
+}
+
+.complete-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.complete-toggle input[type='checkbox'] {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  accent-color: #3f9142;
+}
